@@ -11,6 +11,23 @@ Universal **iframe overlay** widget: one script on the host (`embed.js`), full s
 | [`packages/shared-types`](packages/shared-types) | Zod schemas + protocol types for host ↔ iframe |
 | [`apps/api`](apps/api) | Stub / placeholder for future feedback & AI proxy |
 
+## Deploying to Netlify (overlay app)
+
+The failure you saw (`Failed to resolve entry for package "@projectmate/shared-types"`) happened because **`tsc` incremental state (`*.tsbuildinfo`) was committed**: on a clean clone `dist/` was missing, but TypeScript thought nothing changed and **emitted no files**, so Vite could not resolve the workspace package.
+
+This repo now **deletes `tsconfig.build.tsbuildinfo` before each `shared-types` build** and ignores `*.tsbuildinfo`. Use **`pnpm run build:overlay`** (runs `shared-types` then `overlay-app` in order).
+
+**Netlify settings:**
+
+1. **Base directory**: leave **empty** (repository root) so the root [`netlify.toml`](netlify.toml) applies—or align your UI “build” settings with the same command and publish path.
+2. **Build command** (if not using `netlify.toml`): `pnpm install --frozen-lockfile && pnpm run build:overlay`
+3. **Publish directory**: `apps/overlay-app/dist`
+4. **Node**: 20.x (set in `netlify.toml` as `NODE_VERSION`)
+
+Do **not** set Netlify’s monorepo “package path” only to `apps/overlay-app` unless you also change the install/build to run from the **workspace root**; otherwise `pnpm` cannot see `@projectmate/shared-types`.
+
+`embed.js` is a **separate artifact** (`apps/embed-sdk/dist/embed.js`): publish it as another Netlify site, or to any CDN, and point hosts at that URL.
+
 ## Quick start
 
 ```bash

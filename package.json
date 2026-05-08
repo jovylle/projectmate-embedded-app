@@ -6,7 +6,7 @@
     "build": "pnpm -r run build",
     "build:types": "pnpm --filter @projectmate/shared-types build",
     "build:embed": "pnpm --filter @projectmate/embed-sdk build",
-    "build:overlay": "pnpm --filter @projectmate/overlay-app build",
+    "build:overlay": "pnpm --filter @projectmate/shared-types build && pnpm --filter @projectmate/overlay-app build",
     "dev:overlay": "pnpm --filter @projectmate/overlay-app dev",
     "demo": "pnpm run build && vite --config vite.demo.config.ts"
   },

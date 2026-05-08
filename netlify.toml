@@ -1,0 +1,9 @@
+# Netlify: build the hosted overlay SPA (not the embed script — deploy embed.js separately or add a second site).
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  command = "pnpm install --frozen-lockfile && pnpm run build:overlay"
+  publish = "apps/overlay-app/dist"
+
+[build.environment]
+  NODE_VERSION = "20"

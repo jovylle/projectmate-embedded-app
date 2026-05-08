@@ -8,11 +8,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": ["dist"],
   "scripts": {
+    "prebuild": "node -e \"try{require('fs').unlinkSync('tsconfig.build.tsbuildinfo')}catch(e){}\"",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
