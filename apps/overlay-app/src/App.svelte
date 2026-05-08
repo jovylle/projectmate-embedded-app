@@ -28,6 +28,9 @@
   const feedbackConfigured = $derived(
     !!(config?.web3forms?.accessKey || config?.feedbackEndpoint)
   );
+  const canAttachScreenshot = $derived(
+    !!(config?.feedbackEndpoint && !config?.web3forms?.accessKey)
+  );
 
   const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
 
@@ -159,43 +162,23 @@
     const fromName = w.fromName ?? "ProjectMate";
     const viewport = `${window.innerWidth}x${window.innerHeight}`;
 
-    const hasScreenshot = !!(feedbackScreenshotDataUrl && feedbackScreenshotName);
-    let res: Response;
-
-    if (hasScreenshot) {
-      const blob = dataUrlToBlob(feedbackScreenshotDataUrl!);
-      const fd = new FormData();
-      fd.append("access_key", w.accessKey);
-      fd.append("subject", subject);
-      fd.append("from_name", fromName);
-      fd.append("message", feedbackBody);
-      if (feedbackEmail) fd.append("email", feedbackEmail);
-      fd.append("project_id", c.projectId);
-      if (parentHref) fd.append("page", parentHref);
-      fd.append("user_agent", navigator.userAgent);
-      fd.append("viewport", viewport);
-      fd.append("botcheck", "");
-      if (blob) fd.append("attachment", blob, feedbackScreenshotName!);
-      res = await fetch(WEB3FORMS_ENDPOINT, { method: "POST", body: fd });
-    } else {
-      const body = {
-        access_key: w.accessKey,
-        subject,
-        from_name: fromName,
-        message: feedbackBody,
-        email: feedbackEmail || undefined,
-        project_id: c.projectId,
-        page: parentHref,
-        user_agent: navigator.userAgent,
-        viewport,
-        botcheck: "",
-      };
-      res = await fetch(WEB3FORMS_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(body),
-      });
-    }
+    const body = {
+      access_key: w.accessKey,
+      subject,
+      from_name: fromName,
+      message: feedbackBody,
+      email: feedbackEmail || undefined,
+      project_id: c.projectId,
+      page: parentHref,
+      user_agent: navigator.userAgent,
+      viewport,
+      botcheck: "",
+    };
+    const res = await fetch(WEB3FORMS_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
 
     const json = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
     if (!res.ok || !json?.success) {
@@ -421,7 +404,7 @@
           <span>Email (optional)</span>
           <input type="email" bind:value={feedbackEmail} placeholder="you@example.com" />
         </label>
-        {#if feedbackConfigured}
+        {#if feedbackConfigured && canAttachScreenshot}
           <label class="pm-field">
             <span>Screenshot (optional)</span>
             <input type="file" accept="image/*" onchange={onScreenshotPick} />
@@ -432,6 +415,8 @@
               <span class="pm-err">{feedbackFileHint}</span>
             {/if}
           </label>
+        {:else if config?.web3forms?.accessKey}
+          <p class="pm-note">File attachments are unavailable on the current Web3Forms plan.</p>
         {/if}
         <div class="pm-actions">
           <button
