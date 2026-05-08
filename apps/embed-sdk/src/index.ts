@@ -25,6 +25,8 @@ export type InitConfigInput = {
   };
   changelog?: { version: string; date?: string; bullets?: string[] }[];
   launcher?: {
+    /** When true, the floating launcher button is not rendered. Pair with `autoOpen` or `ProjectMate.open()`. */
+    hidden?: boolean;
     position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
     offsetX?: number;
     offsetY?: number;
@@ -65,6 +67,7 @@ function normalize(raw: InitConfigInput): NormalizedConfig {
     about: raw.features?.about ?? true,
   };
   const launcher = {
+    hidden: raw.launcher?.hidden ?? false,
     position: raw.launcher?.position ?? "bottom-right",
     offsetX: raw.launcher?.offsetX ?? 16,
     offsetY: raw.launcher?.offsetY ?? 16,
@@ -297,6 +300,23 @@ function freezeBackground(hostElement: HTMLElement, on: boolean, restores: { lis
   }
 }
 
+type EmbedAPI = {
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+  isOpen: () => boolean;
+};
+
+let currentInstance: EmbedAPI | null = null;
+let pendingAction: "open" | "close" | "toggle" | null = null;
+
+function applyPending(api: EmbedAPI): void {
+  if (pendingAction === "open") api.open();
+  else if (pendingAction === "close") api.close();
+  else if (pendingAction === "toggle") api.toggle();
+  pendingAction = null;
+}
+
 function scheduleBootstrap(raw: InitConfigInput): void {
   if (typeof document === "undefined") return;
 
@@ -338,19 +358,22 @@ function bootstrap(raw: InitConfigInput): void {
   style.textContent = createStyles();
   shadow.appendChild(style);
 
+  const launcherHidden = config.launcher.hidden === true;
   const launcher = document.createElement("button");
-  launcher.type = "button";
-  launcher.className = "pm-launcher";
-  const label = config.launcher.label?.trim();
-  launcher.textContent = label
-    ? label.slice(0, 3)
-    : config.projectId.slice(0, 1).toUpperCase();
-  launcher.title = "Help & support";
-  launcher.setAttribute("aria-haspopup", "dialog");
-  launcher.setAttribute("aria-expanded", "false");
-  const accent = config.accentColor && config.accentColor.trim() ? config.accentColor.trim() : "#6366f1";
-  launcher.style.background = accent;
-  positionLauncher(launcher, config);
+  if (!launcherHidden) {
+    launcher.type = "button";
+    launcher.className = "pm-launcher";
+    const label = config.launcher.label?.trim();
+    launcher.textContent = label
+      ? label.slice(0, 3)
+      : config.projectId.slice(0, 1).toUpperCase();
+    launcher.title = "Help & support";
+    launcher.setAttribute("aria-haspopup", "dialog");
+    launcher.setAttribute("aria-expanded", "false");
+    const accent = config.accentColor && config.accentColor.trim() ? config.accentColor.trim() : "#6366f1";
+    launcher.style.background = accent;
+    positionLauncher(launcher, config);
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "pm-overlay";
@@ -362,8 +385,15 @@ function bootstrap(raw: InitConfigInput): void {
   frameWrap.className = "pm-frame-wrap";
   overlay.appendChild(frameWrap);
 
-  shadow.appendChild(launcher);
+  if (!launcherHidden) shadow.appendChild(launcher);
   shadow.appendChild(overlay);
+
+  if (launcherHidden && !config.autoOpen) {
+    console.warn(
+      "ProjectMate.init: launcher.hidden is true and no `autoOpen` rule is set. " +
+        "Call ProjectMate.open() programmatically, or the overlay cannot be opened."
+    );
+  }
 
   const inertRestores: { list: InertRestore[] } = { list: [] };
 
@@ -403,8 +433,10 @@ function bootstrap(raw: InitConfigInput): void {
     state.open = true;
     overlay.hidden = false;
     overlay.classList.add("pm-open");
-    launcher.setAttribute("aria-expanded", "true");
-    launcher.tabIndex = -1;
+    if (!launcherHidden) {
+      launcher.setAttribute("aria-expanded", "true");
+      launcher.tabIndex = -1;
+    }
     lockScroll(true);
     freezeBackground(hostElement, true, inertRestores);
 
@@ -437,8 +469,10 @@ function bootstrap(raw: InitConfigInput): void {
     state.open = false;
     overlay.classList.remove("pm-open");
     overlay.hidden = true;
-    launcher.setAttribute("aria-expanded", "false");
-    launcher.tabIndex = 0;
+    if (!launcherHidden) {
+      launcher.setAttribute("aria-expanded", "false");
+      launcher.tabIndex = 0;
+    }
     lockScroll(false);
     freezeBackground(hostElement, false, inertRestores);
     sendToIframe({ v: PROTOCOL_VERSION, type: "PM_CLOSE" });
@@ -462,10 +496,12 @@ function bootstrap(raw: InitConfigInput): void {
 
   window.addEventListener("message", onMessage);
 
-  launcher.addEventListener("click", () => {
-    if (state.open) closeOverlay();
-    else openOverlay();
-  });
+  if (!launcherHidden) {
+    launcher.addEventListener("click", () => {
+      if (state.open) closeOverlay();
+      else openOverlay();
+    });
+  }
 
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) closeOverlay();
@@ -497,6 +533,15 @@ function bootstrap(raw: InitConfigInput): void {
 
   window.addEventListener("hashchange", maybeAutoOpenFromUrl);
   window.addEventListener("popstate", maybeAutoOpenFromUrl);
+
+  const api: EmbedAPI = {
+    open: openOverlay,
+    close: closeOverlay,
+    toggle: () => (state.open ? closeOverlay() : openOverlay()),
+    isOpen: () => state.open,
+  };
+  currentInstance = api;
+  applyPending(api);
 }
 
 /** Public entry: SSR-safe, deferred until DOM ready and idle when available. */
@@ -505,4 +550,27 @@ function init(raw: InitConfigInput): void {
   scheduleBootstrap(raw);
 }
 
-export { init };
+/** Open the overlay programmatically. Queues until init/bootstrap completes. */
+function open(): void {
+  if (currentInstance) currentInstance.open();
+  else pendingAction = "open";
+}
+
+/** Close the overlay programmatically. Queues until init/bootstrap completes. */
+function close(): void {
+  if (currentInstance) currentInstance.close();
+  else pendingAction = "close";
+}
+
+/** Toggle the overlay. Queues until init/bootstrap completes. */
+function toggle(): void {
+  if (currentInstance) currentInstance.toggle();
+  else pendingAction = "toggle";
+}
+
+/** Whether the overlay is currently open. Returns false before bootstrap. */
+function isOpen(): boolean {
+  return currentInstance ? currentInstance.isOpen() : false;
+}
+
+export { init, open, close, toggle, isOpen };

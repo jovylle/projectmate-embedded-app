@@ -93,7 +93,7 @@ Remove or adjust optional blocks you do not use (`changelog`, `web3forms`, `feed
 | `changelog` | Static releases: `[{ version, date?, bullets: string[] }]`. |
 | `feedbackEndpoint` | Absolute URL for `POST` JSON feedback (your backend). Omit if you do not collect feedback. |
 | `web3forms` | `{ accessKey, subject?, fromName? }` — zero-backend feedback via [web3forms.com](https://web3forms.com). Takes precedence over `feedbackEndpoint`. |
-| `launcher` | `{ position, offsetX, offsetY, label? }` — corner and optional short label on the button. |
+| `launcher` | `{ hidden?, position, offsetX, offsetY, label? }` — set `hidden: true` to skip the floating button entirely (use `autoOpen` and/or `ProjectMate.open()` instead). |
 | `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
 
 ### Zero-backend feedback (Web3Forms)
@@ -122,6 +122,31 @@ Optional. If **any** configured rule matches, the overlay opens automatically (a
 - **`hash`**: e.g. `"help"` matches `#help` (leading `#` in the string is optional).
 - **`query`**: `{ name: "help", value: "1" }` matches `?help=1`. Omit `value` to match whenever the param is present and non-empty.
 - **`path`**: e.g. `"/support"` — must start with `/`. Default **`pathMatch`: `"prefix"`** matches `/support` and `/support/…`. Use **`"exact"`** for one pathname only. **`path: "/"` + `"prefix"`** is invalid (would match every page).
+
+### Hide the floating button / open from your own UI
+
+The default floating launcher is great for an always-visible "Help" affordance, but it can feel mismatched when the overlay is fullscreen. Hide it and open the overlay from a **URL fragment** or **your own button**:
+
+```html
+<a href="#help">Open help</a>
+<button onclick="ProjectMate.open()">Open help</button>
+
+<script>
+  ProjectMate.init({
+    projectId: "my-tool",
+    appUrl: "https://projectmate.uft1.com/overlay/",
+    launcher: { hidden: true },
+    autoOpen: { hash: "help" },
+  });
+</script>
+```
+
+Programmatic API on the global, available right after `<script src=".../embed.js">` loads (calls before bootstrap finishes are queued):
+
+- `ProjectMate.open()` — open the overlay
+- `ProjectMate.close()` — close the overlay
+- `ProjectMate.toggle()` — toggle state
+- `ProjectMate.isOpen()` — current open state (false before bootstrap)
 
 ### Behaviour and constraints
 

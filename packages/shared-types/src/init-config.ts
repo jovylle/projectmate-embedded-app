@@ -85,13 +85,15 @@ export const initConfigSchema = z.object({
   changelog: z.array(changelogEntrySchema).optional().default([]),
   launcher: z
     .object({
+      /** When true, the floating launcher button is not rendered. Use with `autoOpen` or `ProjectMate.open()` to trigger the overlay. */
+      hidden: z.boolean().optional().default(false),
       position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).default("bottom-right"),
       offsetX: z.number().default(16),
       offsetY: z.number().default(16),
       label: z.string().optional(),
     })
     .optional()
-    .default({ position: "bottom-right", offsetX: 16, offsetY: 16 }),
+    .default({ hidden: false, position: "bottom-right", offsetX: 16, offsetY: 16 }),
   /** When the host URL matches any rule, open the overlay automatically (also on `hashchange` / `popstate`). */
   autoOpen: autoOpenSchema,
 });
