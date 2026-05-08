@@ -18,6 +18,11 @@ export type InitConfigInput = {
   theme?: "light" | "dark" | "auto";
   accentColor?: string;
   feedbackEndpoint?: string;
+  web3forms?: {
+    accessKey: string;
+    subject?: string;
+    fromName?: string;
+  };
   changelog?: { version: string; date?: string; bullets?: string[] }[];
   launcher?: {
     position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
@@ -93,6 +98,20 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
   if (raw.feedbackEndpoint !== undefined) {
     if (typeof raw.feedbackEndpoint !== "string" || !isHttpUrl(raw.feedbackEndpoint)) {
       throw new Error("ProjectMate.init: feedbackEndpoint must be http(s) URL when set");
+    }
+  }
+  if (raw.web3forms !== undefined) {
+    const w = raw.web3forms;
+    if (!w || typeof w !== "object") {
+      throw new Error("ProjectMate.init: web3forms must be an object when set");
+    }
+    if (typeof w.accessKey !== "string" || !w.accessKey.trim()) {
+      throw new Error("ProjectMate.init: web3forms.accessKey (string) required");
+    }
+    if (raw.feedbackEndpoint) {
+      console.warn(
+        "ProjectMate.init: both `web3forms` and `feedbackEndpoint` set; web3forms takes precedence."
+      );
     }
   }
   const links = raw.links ?? {};

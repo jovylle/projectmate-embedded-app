@@ -49,7 +49,7 @@ export const autoOpenSchema = z
 
 export const initConfigSchema = z.object({
   projectId: z.string(),
-  /** Full URL of the hosted overlay app (iframe src), e.g. https://app.example.com/ */
+  /** Full URL of the hosted overlay app (iframe src), e.g. https://projectmate.uft1.com/overlay/ */
   appUrl: z.string().url(),
   github: z.string().optional(),
   about: z
@@ -69,6 +69,18 @@ export const initConfigSchema = z.object({
   accentColor: z.string().optional(),
   /** Optional feedback POST URL (BYO backend) */
   feedbackEndpoint: z.string().url().optional(),
+  /**
+   * Optional Web3Forms config — zero-backend feedback via web3forms.com.
+   * The `accessKey` is public-by-design; the overlay will POST to
+   * https://api.web3forms.com/submit. Takes precedence over `feedbackEndpoint`.
+   */
+  web3forms: z
+    .object({
+      accessKey: z.string().min(1),
+      subject: z.string().optional(),
+      fromName: z.string().optional(),
+    })
+    .optional(),
   /** Static changelog for Phase 1 */
   changelog: z.array(changelogEntrySchema).optional().default([]),
   launcher: z

@@ -24,6 +24,11 @@
   let feedbackFileHint = $state<string | null>(null);
 
   const features = $derived(config?.features);
+  const feedbackConfigured = $derived(
+    !!(config?.web3forms?.accessKey || config?.feedbackEndpoint)
+  );
+
+  const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
 
   const navItems = $derived.by(() => {
     if (!config || !features) return [];
@@ -116,33 +121,114 @@
     reader.readAsDataURL(file);
   }
 
+  function dataUrlToBlob(dataUrl: string): Blob | null {
+    const match = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
+    if (!match) return null;
+    const mime = match[1] || "application/octet-stream";
+    const isBase64 = !!match[2];
+    const data = match[3] ?? "";
+    try {
+      if (isBase64) {
+        const binary = atob(data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+      }
+      return new Blob([decodeURIComponent(data)], { type: mime });
+    } catch {
+      return null;
+    }
+  }
+
+  async function submitToWeb3Forms(c: InitConfig): Promise<void> {
+    const w = c.web3forms;
+    if (!w?.accessKey) throw new Error("missing access key");
+
+    const subject = w.subject ?? `Feedback — ${c.about?.title ?? c.projectId}`;
+    const fromName = w.fromName ?? "ProjectMate";
+    const viewport = `${window.innerWidth}x${window.innerHeight}`;
+
+    const hasScreenshot = !!(feedbackScreenshotDataUrl && feedbackScreenshotName);
+    let res: Response;
+
+    if (hasScreenshot) {
+      const blob = dataUrlToBlob(feedbackScreenshotDataUrl!);
+      const fd = new FormData();
+      fd.append("access_key", w.accessKey);
+      fd.append("subject", subject);
+      fd.append("from_name", fromName);
+      fd.append("message", feedbackBody);
+      if (feedbackEmail) fd.append("email", feedbackEmail);
+      fd.append("project_id", c.projectId);
+      if (parentHref) fd.append("page", parentHref);
+      fd.append("user_agent", navigator.userAgent);
+      fd.append("viewport", viewport);
+      fd.append("botcheck", "");
+      if (blob) fd.append("attachment", blob, feedbackScreenshotName!);
+      res = await fetch(WEB3FORMS_ENDPOINT, { method: "POST", body: fd });
+    } else {
+      const body = {
+        access_key: w.accessKey,
+        subject,
+        from_name: fromName,
+        message: feedbackBody,
+        email: feedbackEmail || undefined,
+        project_id: c.projectId,
+        page: parentHref,
+        user_agent: navigator.userAgent,
+        viewport,
+        botcheck: "",
+      };
+      res = await fetch(WEB3FORMS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    const json = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
+    if (!res.ok || !json?.success) {
+      throw new Error(json?.message || `Web3Forms ${res.status}`);
+    }
+  }
+
+  async function submitToCustomEndpoint(c: InitConfig): Promise<void> {
+    const url = c.feedbackEndpoint!;
+    const body = {
+      projectId: c.projectId,
+      message: feedbackBody,
+      email: feedbackEmail || undefined,
+      screenshot:
+        feedbackScreenshotDataUrl && feedbackScreenshotName
+          ? { name: feedbackScreenshotName, dataUrl: feedbackScreenshotDataUrl }
+          : undefined,
+      meta: {
+        userAgent: navigator.userAgent,
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        parentHref,
+      },
+    };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(String(res.status));
+  }
+
   async function submitFeedback() {
-    if (!config?.feedbackEndpoint) {
+    if (!config) return;
+    if (!feedbackConfigured) {
       feedbackStatus = "error";
       return;
     }
     feedbackStatus = "sending";
     try {
-      const body = {
-        projectId: config.projectId,
-        message: feedbackBody,
-        email: feedbackEmail || undefined,
-        screenshot:
-          feedbackScreenshotDataUrl && feedbackScreenshotName
-            ? { name: feedbackScreenshotName, dataUrl: feedbackScreenshotDataUrl }
-            : undefined,
-        meta: {
-          userAgent: navigator.userAgent,
-          viewport: { w: window.innerWidth, h: window.innerHeight },
-          parentHref,
-        },
-      };
-      const res = await fetch(config.feedbackEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(String(res.status));
+      if (config.web3forms?.accessKey) {
+        await submitToWeb3Forms(config);
+      } else {
+        await submitToCustomEndpoint(config);
+      }
       feedbackStatus = "sent";
       feedbackBody = "";
       feedbackScreenshotDataUrl = null;
@@ -251,8 +337,8 @@
       {:else if section === "feedback" && features?.feedback}
         <h1>Feedback</h1>
         <p class="pm-lead">Tell us what broke, what confused you, or what you want next.</p>
-        {#if !config.feedbackEndpoint}
-          <p class="pm-note">No <code>feedbackEndpoint</code> configured — form is display-only for now.</p>
+        {#if !feedbackConfigured}
+          <p class="pm-note">No feedback destination configured — form is display-only for now.</p>
         {/if}
         <label class="pm-field">
           <span>Message</span>
@@ -262,7 +348,7 @@
           <span>Email (optional)</span>
           <input type="email" bind:value={feedbackEmail} placeholder="you@example.com" />
         </label>
-        {#if config.feedbackEndpoint}
+        {#if feedbackConfigured}
           <label class="pm-field">
             <span>Screenshot (optional)</span>
             <input type="file" accept="image/*" onchange={onScreenshotPick} />
@@ -278,7 +364,7 @@
           <button
             type="button"
             class="pm-primary"
-            disabled={!config.feedbackEndpoint || !feedbackBody.trim() || feedbackStatus === "sending"}
+            disabled={!feedbackConfigured || !feedbackBody.trim() || feedbackStatus === "sending"}
             onclick={submitFeedback}
           >
             {feedbackStatus === "sending" ? "Sending…" : "Send"}
@@ -286,7 +372,7 @@
           {#if feedbackStatus === "sent"}
             <span class="pm-success">Thanks — received.</span>
           {:else if feedbackStatus === "error"}
-            <span class="pm-err">Could not send. Check endpoint or network.</span>
+            <span class="pm-err">Could not send. Check the destination or your network.</span>
           {/if}
         </div>
       {:else if section === "updates" && features?.updates}

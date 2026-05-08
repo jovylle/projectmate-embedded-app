@@ -12,8 +12,8 @@ Use this section when you want another codebase (or an AI assistant there) to ad
 
 Two **HTTPS** URLs (same or different domains is fine):
 
-1. **`embed.js`** — the bootstrap script (small, vanilla JS). Example: `https://cdn.example.com/projectmate/embed.js`
-2. **Overlay app** — the static UI loaded inside the iframe. Example: `https://app.example.com/` (must resolve to the built app’s `index.html` and its assets)
+1. **`embed.js`** — the bootstrap script (small, vanilla JS). Production: `https://projectmate.uft1.com/embed.js`
+2. **Overlay app** — the static UI loaded inside the iframe. Production: `https://projectmate.uft1.com/overlay/` (must resolve to the built app’s `index.html` and its assets)
 
 The embed validates `postMessage` using **`new URL(appUrl).origin`**, so `appUrl` must be the **canonical base URL** of that overlay deployment (usually the directory that contains `index.html`).
 
@@ -22,11 +22,11 @@ The embed validates `postMessage` using **`new URL(appUrl).origin`**, so `appUrl
 Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...)`** only in the browser (not during SSR without a guard).
 
 ```html
-<script src="https://YOUR-CDN/embed.js"></script>
+<script src="https://projectmate.uft1.com/embed.js"></script>
 <script>
   ProjectMate.init({
     projectId: "YOUR_STABLE_ID",
-    appUrl: "https://YOUR-OVERLAY-APP/",
+    appUrl: "https://projectmate.uft1.com/overlay/",
     about: {
       title: "Your product name",
       description: "One line about what this site/tool does.",
@@ -50,7 +50,11 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
         bullets: ["First public release"],
       },
     ],
-    feedbackEndpoint: "https://YOUR-API.example/feedback",
+    // Zero-backend feedback via web3forms.com (free tier). The access key is
+    // public-by-design. Alternatively, set `feedbackEndpoint` to your own API.
+    web3forms: {
+      accessKey: "YOUR-WEB3FORMS-ACCESS-KEY",
+    },
     launcher: {
       position: "bottom-right",
       offsetX: 16,
@@ -67,7 +71,7 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
 </script>
 ```
 
-Remove or adjust optional blocks you do not use (`changelog`, `feedbackEndpoint`, `autoOpen`, etc.). **`projectId`** and **`appUrl`** are required.
+Remove or adjust optional blocks you do not use (`changelog`, `web3forms`, `feedbackEndpoint`, `autoOpen`, etc.). **`projectId`** and **`appUrl`** are required.
 
 ### Required fields
 
@@ -88,8 +92,28 @@ Remove or adjust optional blocks you do not use (`changelog`, `feedbackEndpoint`
 | `customSections` | Array of `{ title, content }` — `content` is markdown, sanitized in the overlay. |
 | `changelog` | Static releases: `[{ version, date?, bullets: string[] }]`. |
 | `feedbackEndpoint` | Absolute URL for `POST` JSON feedback (your backend). Omit if you do not collect feedback. |
+| `web3forms` | `{ accessKey, subject?, fromName? }` — zero-backend feedback via [web3forms.com](https://web3forms.com). Takes precedence over `feedbackEndpoint`. |
 | `launcher` | `{ position, offsetX, offsetY, label? }` — corner and optional short label on the button. |
 | `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
+
+### Zero-backend feedback (Web3Forms)
+
+If you do not want to run a server just to receive feedback, use [Web3Forms](https://web3forms.com) (free tier: ~250 submissions/month, attachments up to ~5 MB). The access key is **public-by-design** — it is meant to live in client-side code.
+
+```js
+ProjectMate.init({
+  projectId: "my-tool",
+  appUrl: "https://projectmate.uft1.com/overlay/",
+  features: { feedback: true },
+  web3forms: {
+    accessKey: "YOUR-WEB3FORMS-ACCESS-KEY",
+    subject: "Feedback — My Tool",   // optional
+    fromName: "ProjectMate",          // optional
+  },
+});
+```
+
+The overlay POSTs to `https://api.web3forms.com/submit` with the message, email, screenshot (as an attachment when present), plus `project_id`, `page` (parent URL), `user_agent`, and `viewport` so the resulting email has useful context. If both `web3forms` and `feedbackEndpoint` are set, **`web3forms` wins**. If you use CSP on the overlay app, allow `connect-src https://api.web3forms.com`.
 
 ### URL deep links (`autoOpen`)
 
@@ -105,7 +129,7 @@ Optional. If **any** configured rule matches, the overlay opens automatically (a
 - **Deferred bootstrap**: the script waits for `DOMContentLoaded` and prefers `requestIdleCallback` when available so it does not block first paint aggressively.
 - **Isolation**: launcher + overlay chrome use **shadow DOM**; the real UI runs in an **iframe** (`sandbox` includes scripts, same-origin, forms, popups as needed for the overlay app).
 - **While open**: background `document.body` **siblings** get **`inert`**, scroll is locked, **Escape** closes, focus returns to the launcher when closed.
-- **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON).
+- **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON). Web3Forms access keys are **not** secrets (they are public-by-design) and are safe to include.
 
 ### Content-Security-Policy on the **host** page
 
