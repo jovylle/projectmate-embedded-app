@@ -2,6 +2,126 @@
 
 Universal **iframe overlay** widget: one script on the host (`embed.js`), full support-style UI in a hosted app, wired with `postMessage`.
 
+---
+
+## Integrating on a host website (instructions for your project)
+
+Use this section when you want another codebase (or an AI assistant there) to add ProjectMate **without** cloning this repo.
+
+### What you need from whoever deploys ProjectMate
+
+Two **HTTPS** URLs (same or different domains is fine):
+
+1. **`embed.js`** — the bootstrap script (small, vanilla JS). Example: `https://cdn.example.com/projectmate/embed.js`
+2. **Overlay app** — the static UI loaded inside the iframe. Example: `https://app.example.com/` (must resolve to the built app’s `index.html` and its assets)
+
+The embed validates `postMessage` using **`new URL(appUrl).origin`**, so `appUrl` must be the **canonical base URL** of that overlay deployment (usually the directory that contains `index.html`).
+
+### Drop-in snippet
+
+Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...)`** only in the browser (not during SSR without a guard).
+
+```html
+<script src="https://YOUR-CDN/embed.js"></script>
+<script>
+  ProjectMate.init({
+    projectId: "YOUR_STABLE_ID",
+    appUrl: "https://YOUR-OVERLAY-APP/",
+    about: {
+      title: "Your product name",
+      description: "One line about what this site/tool does.",
+    },
+    features: {
+      chat: false,
+      feedback: true,
+      updates: true,
+      issues: false,
+      about: true,
+    },
+    theme: "auto",
+    accentColor: "#4f46e5",
+    links: {
+      docs: "https://example.com/docs",
+    },
+    changelog: [
+      {
+        version: "1.0.0",
+        date: "2026-05-08",
+        bullets: ["First public release"],
+      },
+    ],
+    feedbackEndpoint: "https://YOUR-API.example/feedback",
+    launcher: {
+      position: "bottom-right",
+      offsetX: 16,
+      offsetY: 16,
+      label: "Help",
+    },
+    autoOpen: {
+      hash: "help",
+      query: { name: "help", value: "1" },
+      path: "/support",
+      pathMatch: "prefix",
+    },
+  });
+</script>
+```
+
+Remove or adjust optional blocks you do not use (`changelog`, `feedbackEndpoint`, `autoOpen`, etc.). **`projectId`** and **`appUrl`** are required.
+
+### Required fields
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `projectId` | string | Stable id for your product (shown in payloads / future analytics). |
+| `appUrl` | string (absolute `https://…` URL) | Iframe `src` base for the hosted overlay app. |
+
+### Common optional fields
+
+| Field | Purpose |
+|-------|---------|
+| `about` | `{ title, description }` for the About tab. |
+| `features` | Booleans: `about`, `feedback`, `updates`, `issues`, `chat` — toggles nav sections. |
+| `theme` | `"light"` \| `"dark"` \| `"auto"` (follows `prefers-color-scheme` when `auto`). |
+| `accentColor` | CSS color for launcher / accents, e.g. `"#6366f1"`. |
+| `links` | Object of label → absolute URL (e.g. docs, GitHub). |
+| `customSections` | Array of `{ title, content }` — `content` is markdown, sanitized in the overlay. |
+| `changelog` | Static releases: `[{ version, date?, bullets: string[] }]`. |
+| `feedbackEndpoint` | Absolute URL for `POST` JSON feedback (your backend). Omit if you do not collect feedback. |
+| `launcher` | `{ position, offsetX, offsetY, label? }` — corner and optional short label on the button. |
+| `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
+
+### URL deep links (`autoOpen`)
+
+Optional. If **any** configured rule matches, the overlay opens automatically (also on `hashchange` / `popstate`).
+
+- **`hash`**: e.g. `"help"` matches `#help` (leading `#` in the string is optional).
+- **`query`**: `{ name: "help", value: "1" }` matches `?help=1`. Omit `value` to match whenever the param is present and non-empty.
+- **`path`**: e.g. `"/support"` — must start with `/`. Default **`pathMatch`: `"prefix"`** matches `/support` and `/support/…`. Use **`"exact"`** for one pathname only. **`path: "/"` + `"prefix"`** is invalid (would match every page).
+
+### Behaviour and constraints
+
+- **Single init**: a second `ProjectMate.init` is ignored (warning in the console).
+- **Deferred bootstrap**: the script waits for `DOMContentLoaded` and prefers `requestIdleCallback` when available so it does not block first paint aggressively.
+- **Isolation**: launcher + overlay chrome use **shadow DOM**; the real UI runs in an **iframe** (`sandbox` includes scripts, same-origin, forms, popups as needed for the overlay app).
+- **While open**: background `document.body` **siblings** get **`inert`**, scroll is locked, **Escape** closes, focus returns to the launcher when closed.
+- **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON).
+
+### Content-Security-Policy on the **host** page
+
+If you use CSP, you typically need at least:
+
+- **`script-src`** — include the origin that serves **`embed.js`**.
+- **`frame-src`** (or a compatible directive in your policy) — include the **overlay** origin from `appUrl`, or the browser may block the iframe.
+
+The **overlay app** has its own CSP when you host it; tune `connect-src` there for `feedbackEndpoint` and any APIs the iframe calls.
+
+### Full config schema (maintainers / advanced)
+
+Authoritative TypeScript + Zod definitions live in this repo at [`packages/shared-types/src/init-config.ts`](packages/shared-types/src/init-config.ts) (field names, URLs, defaults).
+
+---
+
 ## Monorepo layout
 
 | Path | Role |
@@ -27,7 +147,7 @@ The site is built with **`pnpm run build:site`**, which writes **`site/out/`**:
 
 If you only need the **overlay bundle** elsewhere (no landing page), you can still run `pnpm run build:overlay` and upload `apps/overlay-app/dist` only.
 
-## Quick start
+## Quick start (this repo)
 
 ```bash
 pnpm install
@@ -43,32 +163,6 @@ This runs a static Vite server (see [`vite.demo.config.ts`](vite.demo.config.ts)
 Use **HTTP** (the demo server), not `file://`, so the iframe and `postMessage` origins behave like production.
 
 The legacy URL [`test.html`](test.html) redirects to **`demo.html`**.
-
-## Host snippet (production shape)
-
-```html
-<script src="https://your-cdn.example.com/embed.js"></script>
-<script>
-  ProjectMate.init({
-    projectId: "my-tool",
-    appUrl: "https://your-app.example.com/",
-    about: { title: "My tool", description: "…" },
-    features: { chat: false, feedback: true, updates: true, issues: false, about: true },
-  });
-</script>
-```
-
-See [`packages/shared-types/src/init-config.ts`](packages/shared-types/src/init-config.ts) for the full config surface (`changelog`, `links`, `theme`, `accentColor`, `feedbackEndpoint`, **`autoOpen`** for `#hash` / `?query` / `/path` triggers, …).
-
-### URL triggers (`autoOpen`)
-
-Optional `autoOpen` on `ProjectMate.init` opens the overlay when **any** configured rule matches the current URL (rules are **OR**’d):
-
-- **`hash`** — e.g. `"help"` matches `#help` (leading `#` in config is optional).
-- **`query`** — `{ name: "pm", value: "1" }` matches `?pm=1`; omit `value` to match any non-empty param value.
-- **`path`** — e.g. `"/support"` with default `pathMatch: "prefix"` matches `/support` and `/support/…`; use `pathMatch: "exact"` for an exact pathname. Paths must start with `/`. Using `path: "/"` with `prefix` is rejected (would match everything).
-
-Also reacts to **`hashchange`** and **`popstate`** so client navigations can open the overlay without a full reload.
 
 ## Development
 
