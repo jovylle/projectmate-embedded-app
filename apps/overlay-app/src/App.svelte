@@ -290,11 +290,12 @@
 {:else}
   <div class="pm-shell" data-loaded="true">
     <aside class="pm-aside">
+      <button type="button" class="pm-back" onclick={requestClose} aria-label="Back to host site">Back</button>
       <div class="pm-brand">
         <span class="pm-dot" style:background="var(--pm-accent, #6366f1)"></span>
         <div>
           <div class="pm-title">{config.about?.title ?? config.projectId}</div>
-          <div class="pm-sub">Support</div>
+          <div class="pm-sub">Community support</div>
         </div>
       </div>
       <nav class="pm-nav">
@@ -309,7 +310,6 @@
           </button>
         {/each}
       </nav>
-      <button type="button" class="pm-close" onclick={requestClose}>Close</button>
     </aside>
     <main class="pm-main">
       {#if section === "about" && features?.about}
@@ -411,25 +411,31 @@
 
 <style>
   :global(html[data-theme="dark"]) {
-    --pm-bg: #0b0f14;
-    --pm-panel: #121826;
+    --pm-bg: #0d1117;
+    --pm-panel: #161b22;
+    --pm-canvas: #010409;
+    --pm-subtle: #0d1117;
     --pm-text: #e8ecf2;
-    --pm-muted: #9aa4b2;
-    --pm-border: #243044;
+    --pm-muted: #8b949e;
+    --pm-border: #30363d;
+    --pm-shadow: rgba(1, 4, 9, 0.24);
   }
   :global(html[data-theme="light"]) {
-    --pm-bg: #f6f7fb;
+    --pm-bg: #f6f8fa;
     --pm-panel: #ffffff;
+    --pm-canvas: #f6f8fa;
+    --pm-subtle: #f6f8fa;
     --pm-text: #0f172a;
-    --pm-muted: #64748b;
-    --pm-border: #e2e8f0;
+    --pm-muted: #57606a;
+    --pm-border: #d0d7de;
+    --pm-shadow: rgba(31, 35, 40, 0.08);
   }
 
   .pm-shell {
     display: flex;
     height: 100%;
     min-height: 100%;
-    background: var(--pm-bg);
+    background: var(--pm-canvas);
     color: var(--pm-text);
     font-family:
       ui-sans-serif,
@@ -450,44 +456,71 @@
   }
 
   .pm-aside {
-    width: 220px;
+    width: 260px;
     border-right: 1px solid var(--pm-border);
-    background: var(--pm-panel);
+    background: var(--pm-bg);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
+    gap: 0.9rem;
+    padding: 1rem 0.9rem;
     box-sizing: border-box;
+  }
+
+  .pm-back {
+    width: 100%;
+    border: 1px solid var(--pm-border);
+    background: var(--pm-panel);
+    color: var(--pm-text);
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+  }
+
+  .pm-back:hover {
+    border-color: var(--pm-accent, #6366f1);
+    background: color-mix(in oklab, var(--pm-accent, #6366f1) 10%, var(--pm-panel));
   }
 
   .pm-brand {
     display: flex;
     gap: 0.75rem;
     align-items: center;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0.85rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
   }
 
   .pm-dot {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 999px;
     flex-shrink: 0;
   }
 
   .pm-title {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.95rem;
+    line-height: 1.25;
   }
 
   .pm-sub {
     font-size: 0.75rem;
     color: var(--pm-muted);
+    margin-top: 0.1rem;
   }
 
   .pm-nav {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.35rem;
     flex: 1;
+    padding-top: 0.25rem;
   }
 
   .pm-nav-item {
@@ -495,42 +528,50 @@
     border: 1px solid transparent;
     background: transparent;
     color: inherit;
-    padding: 0.5rem 0.65rem;
+    padding: 0.6rem 0.7rem;
     border-radius: 0.5rem;
     cursor: pointer;
     font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
   }
 
   .pm-nav-item:hover {
-    background: color-mix(in oklab, var(--pm-accent, #6366f1) 12%, transparent);
+    background: var(--pm-panel);
+    border-color: var(--pm-border);
   }
 
   .pm-nav-item.active {
-    border-color: var(--pm-border);
-    background: color-mix(in oklab, var(--pm-accent, #6366f1) 18%, transparent);
-  }
-
-  .pm-close {
-    margin-top: auto;
-    border: 1px solid var(--pm-border);
-    background: transparent;
-    color: inherit;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    font: inherit;
+    border-color: color-mix(in oklab, var(--pm-accent, #6366f1) 45%, var(--pm-border));
+    background: color-mix(in oklab, var(--pm-accent, #6366f1) 12%, var(--pm-panel));
+    box-shadow: inset 3px 0 0 var(--pm-accent, #6366f1);
   }
 
   .pm-main {
     flex: 1;
     overflow: auto;
-    padding: 1.5rem 2rem;
+    padding: 1.5rem;
     box-sizing: border-box;
+    max-width: 960px;
+    margin: 0 auto;
+    width: 100%;
   }
 
   .pm-main h1 {
-    margin: 0 0 0.5rem;
-    font-size: 1.35rem;
+    margin: 0 0 1rem;
+    font-size: 1.4rem;
+    line-height: 1.25;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 1rem 1.1rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+  }
+
+  .pm-main h1:has(+ .pm-lead) {
+    margin-bottom: 0;
+    border-bottom: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
   }
 
   .pm-main h2 {
@@ -542,14 +583,28 @@
     color: var(--pm-muted);
     margin: 0 0 1rem;
     line-height: 1.55;
+    border: 1px solid var(--pm-border);
+    border-top: 0;
+    border-radius: 0 0 0.75rem 0.75rem;
+    background: var(--pm-panel);
+    padding: 0 1.1rem 1rem;
   }
 
   .pm-meta {
     font-size: 0.9rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.6rem;
+    background: var(--pm-panel);
+    padding: 0.75rem 0.9rem;
   }
 
   .pm-section {
     margin-top: 1rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0 1rem 1rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
   }
 
   .pm-md :global(a) {
@@ -560,18 +615,33 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0;
     font-size: 0.9rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 1rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+  }
+
+  .pm-field + .pm-field,
+  .pm-lead + .pm-field,
+  .pm-note + .pm-field {
+    margin-top: 0.75rem;
   }
 
   .pm-field input,
   .pm-field textarea {
     font: inherit;
-    padding: 0.55rem 0.65rem;
-    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.45rem;
     border: 1px solid var(--pm-border);
-    background: var(--pm-panel);
+    background: var(--pm-subtle);
     color: inherit;
+  }
+
+  .pm-field textarea {
+    resize: vertical;
   }
 
   .pm-actions {
@@ -579,12 +649,18 @@
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
+    margin-top: 0.9rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0.85rem 1rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
   }
 
   .pm-primary {
     border: none;
-    border-radius: 0.5rem;
-    padding: 0.55rem 1rem;
+    border-radius: 0.45rem;
+    padding: 0.6rem 1rem;
     cursor: pointer;
     font: inherit;
     font-weight: 600;
@@ -610,6 +686,10 @@
   .pm-note {
     font-size: 0.9rem;
     color: var(--pm-muted);
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0.85rem 1rem;
   }
 
   .pm-file-meta {
@@ -628,6 +708,7 @@
     border-radius: 0.75rem;
     padding: 1rem;
     background: var(--pm-panel);
+    box-shadow: 0 1px 2px var(--pm-shadow);
   }
 
   .pm-release header {
