@@ -154,6 +154,7 @@ Programmatic API on the global, available right after `<script src=".../embed.js
 - **Deferred bootstrap**: the script waits for `DOMContentLoaded` and prefers `requestIdleCallback` when available so it does not block first paint aggressively.
 - **Isolation**: launcher + overlay chrome use **shadow DOM**; the real UI runs in an **iframe** (`sandbox` includes scripts, same-origin, forms, popups as needed for the overlay app).
 - **While open**: background `document.body` **siblings** get **`inert`**, scroll is locked, **Escape** closes, focus returns to the launcher when closed.
+- **Back button at the launcher's corner**: when the overlay opens, the floating launcher transforms into a back arrow (`←`) at the same corner it was originally placed, so users can dismiss without travelling to the in-iframe Back button. Hidden when `launcher.hidden: true`.
 - **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON). Web3Forms access keys are **not** secrets (they are public-by-design) and are safe to include.
 
 ### Content-Security-Policy on the **host** page

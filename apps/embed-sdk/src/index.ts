@@ -199,7 +199,7 @@ function createStyles(): string {
     *, *::before, *::after { box-sizing: border-box; }
     .pm-launcher {
       position: fixed;
-      z-index: 2147483000;
+      z-index: 2147483002;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       border: none;
       border-radius: 999px;
@@ -214,10 +214,15 @@ function createStyles(): string {
       font-weight: 700;
       font-size: 14px;
       letter-spacing: 0.02em;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, font-size 0.18s ease;
     }
     .pm-launcher:hover { transform: translateY(-1px); }
     .pm-launcher:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    .pm-launcher--open {
+      font-size: 22px;
+      line-height: 1;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.32), inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+    }
     .pm-overlay {
       position: fixed;
       inset: 0;
@@ -360,16 +365,18 @@ function bootstrap(raw: InitConfigInput): void {
 
   const launcherHidden = config.launcher.hidden === true;
   const launcher = document.createElement("button");
+  const launcherLabelText = (() => {
+    const label = config.launcher.label?.trim();
+    return label ? label.slice(0, 3) : config.projectId.slice(0, 1).toUpperCase();
+  })();
   if (!launcherHidden) {
     launcher.type = "button";
     launcher.className = "pm-launcher";
-    const label = config.launcher.label?.trim();
-    launcher.textContent = label
-      ? label.slice(0, 3)
-      : config.projectId.slice(0, 1).toUpperCase();
+    launcher.textContent = launcherLabelText;
     launcher.title = "Help & support";
     launcher.setAttribute("aria-haspopup", "dialog");
     launcher.setAttribute("aria-expanded", "false");
+    launcher.setAttribute("aria-label", "Open help");
     const accent = config.accentColor && config.accentColor.trim() ? config.accentColor.trim() : "#6366f1";
     launcher.style.background = accent;
     positionLauncher(launcher, config);
@@ -435,7 +442,10 @@ function bootstrap(raw: InitConfigInput): void {
     overlay.classList.add("pm-open");
     if (!launcherHidden) {
       launcher.setAttribute("aria-expanded", "true");
-      launcher.tabIndex = -1;
+      launcher.setAttribute("aria-label", "Back to site");
+      launcher.title = "Back to site (Esc)";
+      launcher.textContent = "\u2190";
+      launcher.classList.add("pm-launcher--open");
     }
     lockScroll(true);
     freezeBackground(hostElement, true, inertRestores);
@@ -471,7 +481,10 @@ function bootstrap(raw: InitConfigInput): void {
     overlay.hidden = true;
     if (!launcherHidden) {
       launcher.setAttribute("aria-expanded", "false");
-      launcher.tabIndex = 0;
+      launcher.setAttribute("aria-label", "Open help");
+      launcher.title = "Help & support";
+      launcher.textContent = launcherLabelText;
+      launcher.classList.remove("pm-launcher--open");
     }
     lockScroll(false);
     freezeBackground(hostElement, false, inertRestores);
