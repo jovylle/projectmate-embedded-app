@@ -24,12 +24,17 @@
   let feedbackFileHint = $state<string | null>(null);
   let currentQuote = $state<string | null>(null);
 
+  const DEFAULT_WEB3FORMS_ACCESS_KEY = "4a0e9849-ac3e-47bd-a6c6-005fd77823ed";
+
+  const effectiveWeb3formsAccessKey = $derived(
+    config?.web3forms?.accessKey || DEFAULT_WEB3FORMS_ACCESS_KEY
+  );
   const features = $derived(config?.features);
   const feedbackConfigured = $derived(
-    !!(config?.web3forms?.accessKey || config?.feedbackEndpoint)
+    !!(effectiveWeb3formsAccessKey || config?.feedbackEndpoint)
   );
   const canAttachScreenshot = $derived(
-    !!(config?.feedbackEndpoint && !config?.web3forms?.accessKey)
+    !!(config?.feedbackEndpoint && !effectiveWeb3formsAccessKey)
   );
 
   const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
@@ -156,14 +161,15 @@
 
   async function submitToWeb3Forms(c: InitConfig): Promise<void> {
     const w = c.web3forms;
-    if (!w?.accessKey) throw new Error("missing access key");
+    const accessKey = w?.accessKey || DEFAULT_WEB3FORMS_ACCESS_KEY;
+    if (!accessKey) throw new Error("missing access key");
 
     const subject = w.subject ?? `Feedback — ${c.about?.title ?? c.projectId}`;
     const fromName = w.fromName ?? "ProjectMate";
     const viewport = `${window.innerWidth}x${window.innerHeight}`;
 
     const body = {
-      access_key: w.accessKey,
+      access_key: accessKey,
       subject,
       from_name: fromName,
       message: feedbackBody,
@@ -218,7 +224,7 @@
     }
     feedbackStatus = "sending";
     try {
-      if (config.web3forms?.accessKey) {
+      if (effectiveWeb3formsAccessKey) {
         await submitToWeb3Forms(config);
       } else {
         await submitToCustomEndpoint(config);
@@ -415,7 +421,7 @@
               <span class="pm-err">{feedbackFileHint}</span>
             {/if}
           </label>
-        {:else if config?.web3forms?.accessKey}
+        {:else if effectiveWeb3formsAccessKey}
           <p class="pm-note">File attachments are unavailable on the current Web3Forms plan.</p>
         {/if}
         <div class="pm-actions">
