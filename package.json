@@ -1,0 +1,17 @@
+{
+  "name": "projectmate-embedded-app",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "build:types": "pnpm --filter @projectmate/shared-types build",
+    "build:embed": "pnpm --filter @projectmate/embed-sdk build",
+    "build:overlay": "pnpm --filter @projectmate/overlay-app build",
+    "dev:overlay": "pnpm --filter @projectmate/overlay-app dev",
+    "demo": "pnpm run build && vite --config vite.demo.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

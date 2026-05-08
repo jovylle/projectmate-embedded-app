@@ -1,0 +1,9 @@
+{
+  "name": "@projectmate/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Placeholder for feedback ingestion, GitHub proxy, and AI chat (Phase 2+).",
+  "scripts": {
+    "build": "echo \"No build yet\""
+  }
+}

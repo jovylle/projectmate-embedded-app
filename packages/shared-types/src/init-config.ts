@@ -1,0 +1,71 @@
+import { z } from "zod";
+
+export const themeModeSchema = z.enum(["light", "dark", "auto"]);
+
+export const featuresSchema = z
+  .object({
+    chat: z.boolean().default(false),
+    feedback: z.boolean().default(true),
+    updates: z.boolean().default(true),
+    issues: z.boolean().default(false),
+    about: z.boolean().default(true),
+  })
+  .default({
+    chat: false,
+    feedback: true,
+    updates: true,
+    issues: false,
+    about: true,
+  });
+
+export const customSectionSchema = z.object({
+  title: z.string(),
+  /** Markdown or plain text; host/iframe sanitizes before HTML */
+  content: z.string(),
+});
+
+export const changelogEntrySchema = z.object({
+  version: z.string(),
+  date: z.string().optional(),
+  bullets: z.array(z.string()).default([]),
+});
+
+export const initConfigSchema = z.object({
+  projectId: z.string(),
+  /** Full URL of the hosted overlay app (iframe src), e.g. https://app.example.com/ */
+  appUrl: z.string().url(),
+  github: z.string().optional(),
+  about: z
+    .object({
+      title: z.string(),
+      description: z.string(),
+    })
+    .optional(),
+  links: z
+    .record(z.string(), z.string().url())
+    .optional()
+    .default({}),
+  customSections: z.array(customSectionSchema).optional().default([]),
+  features: featuresSchema,
+  theme: themeModeSchema.optional().default("auto"),
+  /** CSS color, e.g. #6366f1 */
+  accentColor: z.string().optional(),
+  /** Optional feedback POST URL (BYO backend) */
+  feedbackEndpoint: z.string().url().optional(),
+  /** Static changelog for Phase 1 */
+  changelog: z.array(changelogEntrySchema).optional().default([]),
+  launcher: z
+    .object({
+      position: z.enum(["bottom-right", "bottom-left", "top-right", "top-left"]).default("bottom-right"),
+      offsetX: z.number().default(16),
+      offsetY: z.number().default(16),
+      label: z.string().optional(),
+    })
+    .optional()
+    .default({ position: "bottom-right", offsetX: 16, offsetY: 16 }),
+});
+
+export type InitConfig = z.infer<typeof initConfigSchema>;
+export type ThemeMode = z.infer<typeof themeModeSchema>;
+export type Features = z.infer<typeof featuresSchema>;
+export type ChangelogEntry = z.infer<typeof changelogEntrySchema>;
