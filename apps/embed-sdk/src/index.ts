@@ -250,7 +250,36 @@ function createStyles(): string {
       width: 100%;
       height: 100%;
       border: 0;
-      background: #0b0f14;
+      background: #f6f8fa;
+    }
+    .pm-frame-loading {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+      color: #334155;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      pointer-events: none;
+    }
+    .pm-overlay.pm-open[data-loading="true"] .pm-frame-loading {
+      display: flex;
+    }
+    .pm-loader-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 3px solid #c7d2fe;
+      border-top-color: #4f46e5;
+      animation: pm-spin 0.8s linear infinite;
+    }
+    @keyframes pm-spin {
+      to { transform: rotate(360deg); }
     }
   `;
 }
@@ -390,6 +419,16 @@ function bootstrap(raw: InitConfigInput): void {
 
   const frameWrap = document.createElement("div");
   frameWrap.className = "pm-frame-wrap";
+  frameWrap.style.position = "relative";
+  const frameLoading = document.createElement("div");
+  frameLoading.className = "pm-frame-loading";
+  const loaderDot = document.createElement("div");
+  loaderDot.className = "pm-loader-dot";
+  const loaderText = document.createElement("div");
+  loaderText.textContent = "Loading support…";
+  frameLoading.appendChild(loaderDot);
+  frameLoading.appendChild(loaderText);
+  frameWrap.appendChild(frameLoading);
   overlay.appendChild(frameWrap);
 
   if (!launcherHidden) shadow.appendChild(launcher);
@@ -440,6 +479,7 @@ function bootstrap(raw: InitConfigInput): void {
     state.open = true;
     overlay.hidden = false;
     overlay.classList.add("pm-open");
+    overlay.setAttribute("data-loading", state.iframe ? "false" : "true");
     if (!launcherHidden) {
       launcher.setAttribute("aria-expanded", "true");
       launcher.setAttribute("aria-label", "Back to site");
@@ -500,6 +540,7 @@ function bootstrap(raw: InitConfigInput): void {
     if (!data || typeof data !== "object") return;
     if (data.v !== PROTOCOL_VERSION) return;
     if (data.type === "PM_READY") {
+      overlay.setAttribute("data-loading", "false");
       return;
     }
     if (data.type === "PM_REQUEST_CLOSE") {

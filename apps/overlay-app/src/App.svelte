@@ -296,7 +296,10 @@
   </div>
 {:else if !config}
   <div class="pm-shell pm-loading">
-    <p>Loading…</p>
+    <div class="pm-loading-indicator" aria-live="polite" aria-busy="true">
+      <span class="pm-loading-spinner" aria-hidden="true"></span>
+      <p>Loading support...</p>
+    </div>
   </div>
 {:else}
   <div class="pm-shell" data-loaded="true">
@@ -361,15 +364,6 @@
               {/if}
               {#if config.multiHost?.enabled}
                 <p class="pm-meta"><strong>Portfolio mode:</strong> Enabled</p>
-              {/if}
-              {#if config.multiHost?.totalHosts}
-                <p class="pm-meta"><strong>Total Workspaces:</strong> {config.multiHost.totalHosts}</p>
-              {/if}
-              {#if config.multiHost?.activeHostId}
-                <p class="pm-meta"><strong>Active Workspace:</strong> <code>{config.multiHost.activeHostId}</code></p>
-              {/if}
-              {#if config.multiHost?.benchmarkLabel}
-                <p class="pm-meta"><strong>Benchmark:</strong> {config.multiHost.benchmarkLabel}</p>
               {/if}
             </div>
             {#if config.host?.modules && Object.keys(config.host.modules).length}
@@ -489,6 +483,17 @@
 {/if}
 
 <style>
+  :global(html) {
+    --pm-bg: #f6f8fa;
+    --pm-panel: #ffffff;
+    --pm-canvas: #f6f8fa;
+    --pm-subtle: #f6f8fa;
+    --pm-text: #0f172a;
+    --pm-muted: #57606a;
+    --pm-border: #d0d7de;
+    --pm-shadow: rgba(31, 35, 40, 0.08);
+  }
+
   :global(html[data-theme="dark"]) {
     --pm-bg: #0d1117;
     --pm-panel: #161b22;
@@ -532,6 +537,39 @@
     align-items: center;
     justify-content: center;
     padding: 2rem;
+  }
+
+  .pm-loading-indicator {
+    border: 1px solid var(--pm-border);
+    border-radius: 0.85rem;
+    background: var(--pm-panel);
+    padding: 1rem 1.15rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    color: var(--pm-muted);
+    font-weight: 600;
+  }
+
+  .pm-loading-indicator p {
+    margin: 0;
+  }
+
+  .pm-loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    border: 2px solid color-mix(in oklab, var(--pm-accent, #6366f1) 28%, var(--pm-border));
+    border-top-color: var(--pm-accent, #6366f1);
+    animation: pm-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pm-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .pm-aside {
