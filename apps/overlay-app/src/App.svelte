@@ -22,6 +22,7 @@
   let feedbackScreenshotName = $state<string | null>(null);
   let feedbackScreenshotDataUrl = $state<string | null>(null);
   let feedbackFileHint = $state<string | null>(null);
+  let currentQuote = $state<string | null>(null);
 
   const features = $derived(config?.features);
   const feedbackConfigured = $derived(
@@ -56,6 +57,16 @@
     const onChange = () => applyTheme(c);
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
+  });
+
+  $effect(() => {
+    const quotes = config?.quotes ?? [];
+    if (!quotes.length) {
+      currentQuote = null;
+      return;
+    }
+    const idx = Math.floor(Math.random() * quotes.length);
+    currentQuote = quotes[idx] ?? null;
   });
 
   function applyTheme(c: InitConfig) {
@@ -316,6 +327,74 @@
         <h1>{config.about?.title ?? config.projectId}</h1>
         {#if config.about?.description}
           <p class="pm-lead">{config.about.description}</p>
+        {/if}
+        {#if config.host || config.multiHost}
+          <section class="pm-section">
+            <h2>Host details</h2>
+            <div class="pm-meta-grid">
+              {#if config.host?.name}
+                <p class="pm-meta"><strong>Host:</strong> {config.host.name}</p>
+              {/if}
+              {#if config.host?.id}
+                <p class="pm-meta"><strong>Host ID:</strong> <code>{config.host.id}</code></p>
+              {/if}
+              {#if config.host?.version}
+                <p class="pm-meta"><strong>Version:</strong> <code>{config.host.version}</code></p>
+              {/if}
+              {#if config.host?.environment}
+                <p class="pm-meta"><strong>Environment:</strong> {config.host.environment}</p>
+              {/if}
+              {#if config.host?.locale}
+                <p class="pm-meta"><strong>Locale:</strong> {config.host.locale}</p>
+              {/if}
+              {#if config.host?.timezone}
+                <p class="pm-meta"><strong>Timezone:</strong> {config.host.timezone}</p>
+              {/if}
+              {#if config.host?.plan}
+                <p class="pm-meta"><strong>Plan:</strong> {config.host.plan}</p>
+              {/if}
+              {#if config.host?.region}
+                <p class="pm-meta"><strong>Region:</strong> {config.host.region}</p>
+              {/if}
+              {#if config.host?.supportEmail}
+                <p class="pm-meta"><strong>Support:</strong> {config.host.supportEmail}</p>
+              {/if}
+              {#if config.multiHost?.enabled}
+                <p class="pm-meta"><strong>Multi-host:</strong> Enabled</p>
+              {/if}
+              {#if config.multiHost?.totalHosts}
+                <p class="pm-meta"><strong>Total Hosts:</strong> {config.multiHost.totalHosts}</p>
+              {/if}
+              {#if config.multiHost?.activeHostId}
+                <p class="pm-meta"><strong>Active Host:</strong> <code>{config.multiHost.activeHostId}</code></p>
+              {/if}
+              {#if config.multiHost?.benchmarkLabel}
+                <p class="pm-meta"><strong>Benchmark:</strong> {config.multiHost.benchmarkLabel}</p>
+              {/if}
+            </div>
+            {#if config.host?.modules && Object.keys(config.host.modules).length}
+              <h3 class="pm-subhead">Modules</h3>
+              <div class="pm-tag-row">
+                {#each Object.entries(config.host.modules) as [module, enabled]}
+                  <span class="pm-tag" class:enabled={enabled}>{module}: {enabled ? "on" : "off"}</span>
+                {/each}
+              </div>
+            {/if}
+            {#if config.host?.permissions && Object.keys(config.host.permissions).length}
+              <h3 class="pm-subhead">Permissions</h3>
+              <div class="pm-tag-row">
+                {#each Object.entries(config.host.permissions) as [role, allowed]}
+                  <span class="pm-tag">{role}: {allowed.join(", ")}</span>
+                {/each}
+              </div>
+            {/if}
+          </section>
+        {/if}
+        {#if currentQuote}
+          <section class="pm-section pm-quote">
+            <h2>Quote of the moment</h2>
+            <blockquote>{currentQuote}</blockquote>
+          </section>
         {/if}
         {#if config.github}
           <p class="pm-meta">GitHub: <code>{config.github}</code></p>
@@ -579,6 +658,12 @@
     font-size: 1.05rem;
   }
 
+  .pm-subhead {
+    margin: 0.9rem 0 0.45rem;
+    font-size: 0.9rem;
+    color: var(--pm-muted);
+  }
+
   .pm-lead {
     color: var(--pm-muted);
     margin: 0 0 1rem;
@@ -596,6 +681,41 @@
     border-radius: 0.6rem;
     background: var(--pm-panel);
     padding: 0.75rem 0.9rem;
+  }
+
+  .pm-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.6rem;
+  }
+
+  .pm-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .pm-tag {
+    border: 1px solid var(--pm-border);
+    border-radius: 999px;
+    padding: 0.22rem 0.65rem;
+    font-size: 0.8rem;
+    background: var(--pm-subtle);
+  }
+
+  .pm-tag.enabled {
+    border-color: color-mix(in oklab, var(--pm-accent, #6366f1) 45%, var(--pm-border));
+    background: color-mix(in oklab, var(--pm-accent, #6366f1) 12%, var(--pm-subtle));
+  }
+
+  .pm-quote blockquote {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border-left: 3px solid var(--pm-accent, #6366f1);
+    border-radius: 0.55rem;
+    background: var(--pm-subtle);
+    color: var(--pm-muted);
+    font-style: italic;
   }
 
   .pm-section {

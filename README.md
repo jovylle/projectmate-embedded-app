@@ -27,6 +27,34 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
   ProjectMate.init({
     projectId: "YOUR_STABLE_ID",
     appUrl: "https://projectmate.uft1.com/overlay/",
+    host: {
+      id: "acme-prod",
+      name: "Acme",
+      version: "2.4.1",
+      environment: "production",
+      plan: "enterprise",
+      region: "ap-southeast-1",
+      locale: "en-PH",
+      timezone: "Asia/Manila",
+      supportEmail: "support@acme.com",
+      modules: {
+        feedback: true,
+        updates: true,
+        issues: false,
+        chat: false,
+      },
+      permissions: {
+        admin: ["view", "manage", "publish"],
+        viewer: ["view"],
+      },
+    },
+    multiHost: {
+      enabled: true,
+      activeHostId: "acme-prod",
+      totalHosts: 6,
+      canSwitchHosts: true,
+      benchmarkLabel: "Top 25% response time this week",
+    },
     about: {
       title: "Your product name",
       description: "One line about what this site/tool does.",
@@ -45,10 +73,20 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
     },
     changelog: [
       {
+        version: "Host v2.4.1",
+        date: "2026-05-09",
+        bullets: ["Current host-site version deployed", "ProjectMate multi-host metadata enabled"],
+      },
+      {
         version: "1.0.0",
         date: "2026-05-08",
         bullets: ["First public release"],
       },
+    ],
+    quotes: [
+      "Great hosting is thoughtful consistency.",
+      "Ship, learn, improve.",
+      "Clarity beats cleverness.",
     ],
     // Zero-backend feedback via web3forms.com (free tier). The access key is
     // public-by-design. Alternatively, set `feedbackEndpoint` to your own API.
@@ -90,7 +128,10 @@ Remove or adjust optional blocks you do not use (`changelog`, `web3forms`, `feed
 | `accentColor` | CSS color for launcher / accents, e.g. `"#6366f1"`. |
 | `links` | Object of label → absolute URL (e.g. docs, GitHub). |
 | `customSections` | Array of `{ title, content }` — `content` is markdown, sanitized in the overlay. |
+| `host` | Host metadata shown in About: `{ id, name, version, environment, plan, region, locale, timezone, supportEmail, modules, permissions }`. |
+| `multiHost` | Aggregate context for multi-tenant pages: `{ enabled, activeHostId, totalHosts, canSwitchHosts, benchmarkLabel }`. |
 | `changelog` | Static releases: `[{ version, date?, bullets: string[] }]`. |
+| `quotes` | Array of strings; overlay picks one random quote for About on load. |
 | `feedbackEndpoint` | Absolute URL for `POST` JSON feedback (your backend). Omit if you do not collect feedback. |
 | `web3forms` | `{ accessKey, subject?, fromName? }` — zero-backend feedback via [web3forms.com](https://web3forms.com). Takes precedence over `feedbackEndpoint`. |
 | `launcher` | `{ hidden?, position, offsetX, offsetY, label? }` — set `hidden: true` to skip the floating button entirely (use `autoOpen` and/or `ProjectMate.open()` instead). |

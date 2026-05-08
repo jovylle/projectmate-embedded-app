@@ -34,10 +34,38 @@
       ProjectMate.init({
         projectId: "demo",
         appUrl,
+        host: {
+          id: "demo-local",
+          name: "Demo Host",
+          version: "2.4.1",
+          environment: "development",
+          plan: "starter",
+          region: "local",
+          locale: "en-US",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          supportEmail: "support@example.com",
+          modules: { about: true, feedback: true, updates: true, issues: false, chat: false },
+          permissions: {
+            admin: ["view", "manage", "publish"],
+            viewer: ["view"],
+          },
+        },
+        multiHost: {
+          enabled: true,
+          activeHostId: "demo-local",
+          totalHosts: 3,
+          canSwitchHosts: true,
+          benchmarkLabel: "Demo benchmark: p95 response in top 30%",
+        },
         about: {
           title: "Demo project",
           description: "This overlay is loaded from the local build output.",
         },
+        quotes: [
+          "Great products listen before they ship.",
+          "Small feedback loops build better UX.",
+          "Clarity beats cleverness.",
+        ],
         links: {
           repo: "https://github.com/jovylle/projectmate-embedded-app",
         },

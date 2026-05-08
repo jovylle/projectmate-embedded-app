@@ -24,6 +24,33 @@ export const customSectionSchema = z.object({
   content: z.string(),
 });
 
+export const hostMetaSchema = z.object({
+  /** Stable host/tenant identifier (e.g. acme-prod) */
+  id: z.string().min(1),
+  /** Human-friendly host name */
+  name: z.string().min(1),
+  /** Host-provided current app/site version to display in overlay */
+  version: z.string().min(1),
+  environment: z.enum(["development", "staging", "production"]).optional().default("production"),
+  plan: z.string().optional(),
+  region: z.string().optional(),
+  locale: z.string().optional(),
+  timezone: z.string().optional(),
+  supportEmail: z.string().email().optional(),
+  /** Per-host module toggles for UI metadata (separate from `features` behavior toggles). */
+  modules: z.record(z.boolean()).optional().default({}),
+  /** Optional role mapping, e.g. { admin: ["view", "manage"], viewer: ["view"] } */
+  permissions: z.record(z.array(z.string())).optional().default({}),
+});
+
+export const multiHostSchema = z.object({
+  enabled: z.boolean().optional().default(false),
+  activeHostId: z.string().optional(),
+  totalHosts: z.number().int().positive().optional(),
+  canSwitchHosts: z.boolean().optional(),
+  benchmarkLabel: z.string().optional(),
+});
+
 export const changelogEntrySchema = z.object({
   version: z.string(),
   date: z.string().optional(),
@@ -63,6 +90,12 @@ export const initConfigSchema = z.object({
     .optional()
     .default({}),
   customSections: z.array(customSectionSchema).optional().default([]),
+  /** Host/tenant metadata for multi-host overlays. */
+  host: hostMetaSchema.optional(),
+  /** Optional aggregate metadata when serving multiple hosts/workspaces. */
+  multiHost: multiHostSchema.optional(),
+  /** Optional quotes shown in About; overlay picks one at random on load. */
+  quotes: z.array(z.string().min(1)).optional().default([]),
   features: featuresSchema,
   theme: themeModeSchema.optional().default("auto"),
   /** CSS color, e.g. #6366f1 */
