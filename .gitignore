@@ -1,6 +1,7 @@
 node_modules
 *.tsbuildinfo
 dist
+site/out
 .DS_Store
 *.local
 .svelte-kit

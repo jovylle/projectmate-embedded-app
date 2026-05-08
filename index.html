@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProjectMate — embedded support widget</title>
+    <meta
+      name="description"
+      content="Drop-in overlay for static sites: help, feedback, changelog. One script on the host, full UI in an iframe."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6fb;
+        --card: #fff;
+        --text: #0f172a;
+        --muted: #475569;
+        --accent: #4f46e5;
+        --accent-dim: #6366f1;
+        --border: #e2e8f0;
+        --code-bg: #0f172a0c;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0c1017;
+          --card: #141a24;
+          --text: #e8edf5;
+          --muted: #94a3b8;
+          --border: #243044;
+          --code-bg: #ffffff10;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          Ubuntu,
+          Cantarell,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+      a {
+        color: var(--accent);
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+      }
+      header {
+        margin-bottom: 2.5rem;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: color-mix(in oklab, var(--accent) 14%, transparent);
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        margin-bottom: 0.75rem;
+      }
+      h1 {
+        font-size: clamp(1.75rem, 4vw, 2.25rem);
+        line-height: 1.2;
+        margin: 0 0 0.75rem;
+        font-weight: 700;
+      }
+      .lead {
+        font-size: 1.1rem;
+        color: var(--muted);
+        margin: 0;
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.35rem 1.5rem;
+        margin-bottom: 1.25rem;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin: 0 0 0.65rem;
+      }
+      p {
+        margin: 0 0 0.75rem;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        padding: 0.55rem 1.1rem;
+        border-radius: 0.6rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-decoration: none !important;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff !important;
+      }
+      .btn-primary:hover {
+        filter: brightness(1.06);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text) !important;
+        border-color: var(--border);
+      }
+      pre {
+        margin: 0.75rem 0 0;
+        padding: 1rem;
+        border-radius: 0.65rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        overflow-x: auto;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      footer {
+        margin-top: 2.5rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <span class="badge">Open source</span>
+        <h1>ProjectMate</h1>
+        <p class="lead">
+          A tiny <strong>embed.js</strong> on your site plus a hosted <strong>iframe overlay</strong> — About, feedback, and
+          changelog without building your own support stack.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="./demo.html">Try the live demo</a>
+          <a class="btn btn-ghost" href="https://github.com/jovylle/projectmate-embedded-app">View on GitHub</a>
+        </div>
+      </header>
+
+      <section>
+        <h2>What it is</h2>
+        <p>
+          Visitors click a floating launcher on <em>your</em> page. A fullscreen overlay opens and loads a separate app
+          in an iframe — isolated from your CSS and JS. Configuration (copy, links, feature flags, theme) is passed over
+          <code>postMessage</code>.
+        </p>
+        <p>
+          You keep your site static or minimal; you do not add routes or a backend just to ship “help / feedback /
+          what’s new”.
+        </p>
+      </section>
+
+      <section>
+        <h2>Where’s the demo?</h2>
+        <p>
+          Open <a href="./demo.html"><strong>demo.html</strong></a> after running <code>pnpm build</code> and
+          <code>pnpm demo</code> (served over HTTP, not <code>file://</code>). You’ll see a sample host page and the
+          floating widget.
+        </p>
+        <p style="font-size: 0.95rem; color: var(--muted)">
+          On Netlify, the same demo is published at <code>/demo.html</code> next to this page once the site build
+          finishes.
+        </p>
+      </section>
+
+      <section>
+        <h2>Basic use</h2>
+        <p>Host your built <code>embed.js</code>, host the overlay app, then:</p>
+        <pre><code>&lt;script src="https://your-cdn.example.com/embed.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  ProjectMate.init({
+    projectId: "my-tool",
+    appUrl: "https://your-app.example.com/",
+    about: { title: "My tool", description: "…" },
+    features: { chat: false, feedback: true, updates: true, issues: false, about: true },
+  });
+&lt;/script&gt;</code></pre>
+        <p style="margin-top: 0.85rem; font-size: 0.95rem; color: var(--muted)">
+          Full options (changelog, links, accent, <code>feedbackEndpoint</code>, …) are in the repo README and
+          <code>packages/shared-types</code>.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          Repository:
+          <a href="https://github.com/jovylle/projectmate-embedded-app">github.com/jovylle/projectmate-embedded-app</a>
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

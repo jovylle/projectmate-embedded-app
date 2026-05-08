@@ -11,22 +11,21 @@ Universal **iframe overlay** widget: one script on the host (`embed.js`), full s
 | [`packages/shared-types`](packages/shared-types) | Zod schemas + protocol types for host ↔ iframe |
 | [`apps/api`](apps/api) | Stub / placeholder for future feedback & AI proxy |
 
-## Deploying to Netlify (overlay app)
+## Deploying to Netlify
 
-The failure you saw (`Failed to resolve entry for package "@projectmate/shared-types"`) happened because **`tsc` incremental state (`*.tsbuildinfo`) was committed**: on a clean clone `dist/` was missing, but TypeScript thought nothing changed and **emitted no files**, so Vite could not resolve the workspace package.
+The site is built with **`pnpm run build:site`**, which writes **`site/out/`**:
 
-This repo now **deletes `tsconfig.build.tsbuildinfo` before each `shared-types` build** and ignores `*.tsbuildinfo`. Use **`pnpm run build:overlay`** (runs `shared-types` then `overlay-app` in order).
+- [`index.html`](index.html) — marketing homepage (what / demo / basic use)
+- `demo.html` — sample host page with paths rewritten for production (`./embed.js`, `./overlay/…`)
+- `embed.js` and `overlay/` (full Vite output of the iframe app)
 
-**Netlify settings:**
+[`netlify.toml`](netlify.toml) uses that command and publishes **`site/out`**. **Base directory** in the Netlify UI should stay the **repository root** (empty) so pnpm sees the whole workspace.
 
-1. **Base directory**: leave **empty** (repository root) so the root [`netlify.toml`](netlify.toml) applies—or align your UI “build” settings with the same command and publish path.
-2. **Build command** (if not using `netlify.toml`): `pnpm install --frozen-lockfile && pnpm run build:overlay`
-3. **Publish directory**: `apps/overlay-app/dist`
-4. **Node**: 20.x (set in `netlify.toml` as `NODE_VERSION`)
+**TypeScript incremental gotcha (fixed in repo):** a committed `*.tsbuildinfo` could make `tsc` skip emitting `packages/shared-types/dist` on a clean clone; the shared-types package now clears that file before each build, and `*.tsbuildinfo` is gitignored.
 
-Do **not** set Netlify’s monorepo “package path” only to `apps/overlay-app` unless you also change the install/build to run from the **workspace root**; otherwise `pnpm` cannot see `@projectmate/shared-types`.
+**Node:** 20.x (`NODE_VERSION` in `netlify.toml`).
 
-`embed.js` is a **separate artifact** (`apps/embed-sdk/dist/embed.js`): publish it as another Netlify site, or to any CDN, and point hosts at that URL.
+If you only need the **overlay bundle** elsewhere (no landing page), you can still run `pnpm run build:overlay` and upload `apps/overlay-app/dist` only.
 
 ## Quick start
 
@@ -36,12 +35,14 @@ pnpm build
 pnpm demo
 ```
 
-This runs a static Vite server (see [`vite.demo.config.ts`](vite.demo.config.ts)) and opens [`test.html`](test.html). The demo expects **built** artifacts at:
+This runs a static Vite server (see [`vite.demo.config.ts`](vite.demo.config.ts)) and opens the **homepage** ([`index.html`](index.html)). From there, use **Try the live demo** → [`demo.html`](demo.html). The demo expects **built** artifacts at:
 
 - `./apps/embed-sdk/dist/embed.js`
 - `./apps/overlay-app/dist/index.html` (and hashed assets beside it)
 
 Use **HTTP** (the demo server), not `file://`, so the iframe and `postMessage` origins behave like production.
+
+The legacy URL [`test.html`](test.html) redirects to **`demo.html`**.
 
 ## Host snippet (production shape)
 

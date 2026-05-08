@@ -1,13 +1,13 @@
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
-/** Serves repo root so `test.html` can load built embed + overlay from disk paths. */
+/** Serves repo root: `index.html` (home), `demo.html` (widget), and built app paths. */
 export default defineConfig({
   root: resolve(__dirname),
   server: {
     port: 8787,
     strictPort: true,
-    open: "/test.html",
+    open: "/index.html",
   },
   publicDir: false,
 });

@@ -2,58 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ProjectMate embed demo</title>
-    <style>
-      body {
-        font-family: system-ui, sans-serif;
-        margin: 2rem;
-        line-height: 1.5;
-      }
-    </style>
+    <meta http-equiv="refresh" content="0; url=./demo.html" />
+    <title>Redirect…</title>
   </head>
   <body>
-    <h1>Host page (demo)</h1>
-    <p>This page simulates a static site. Use the floating button to open the overlay.</p>
-    <p>Run <code>pnpm demo</code> after <code>pnpm build</code> (serves this file over HTTP).</p>
-
-    <script src="./apps/embed-sdk/dist/embed.js"></script>
-    <script>
-      const appUrl = new URL("./apps/overlay-app/dist/index.html", window.location.href).href;
-      ProjectMate.init({
-        projectId: "demo",
-        appUrl,
-        about: {
-          title: "Demo project",
-          description: "This overlay is loaded from the local build output.",
-        },
-        links: {
-          repo: "https://github.com/jovyllebermudez/projectmate-embedded-app",
-        },
-        customSections: [
-          {
-            title: "Privacy",
-            content: "This is **markdown**: nothing leaves your machine in this demo unless you submit feedback to a configured endpoint.",
-          },
-        ],
-        features: {
-          chat: false,
-          feedback: true,
-          updates: true,
-          issues: false,
-          about: true,
-        },
-        theme: "auto",
-        accentColor: "#6366f1",
-        changelog: [
-          {
-            version: "0.1.0",
-            date: "2026-05-08",
-            bullets: ["Initial overlay shell", "About / Feedback / Updates tabs", "postMessage bridge"],
-          },
-        ],
-        launcher: { position: "bottom-right", label: "PM" },
-      });
-    </script>
+    <p>Moved to <a href="./demo.html">demo.html</a>.</p>
   </body>
 </html>
