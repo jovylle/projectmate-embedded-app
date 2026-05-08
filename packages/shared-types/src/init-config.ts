@@ -30,6 +30,23 @@ export const changelogEntrySchema = z.object({
   bullets: z.array(z.string()).default([]),
 });
 
+export const autoOpenSchema = z
+  .object({
+    /** Match `location.hash` after stripping `#` (config may include or omit leading `#`). */
+    hash: z.string().min(1).optional(),
+    /** Match a query param; if `value` is set it must match exactly, otherwise any non-empty value matches. */
+    query: z
+      .object({
+        name: z.string().min(1),
+        value: z.string().optional(),
+      })
+      .optional(),
+    /** Match `location.pathname` (exact, or prefix when `pathMatch` is `prefix`). */
+    path: z.string().min(1).regex(/^\//).optional(),
+    pathMatch: z.enum(["exact", "prefix"]).optional().default("prefix"),
+  })
+  .optional();
+
 export const initConfigSchema = z.object({
   projectId: z.string(),
   /** Full URL of the hosted overlay app (iframe src), e.g. https://app.example.com/ */
@@ -63,9 +80,12 @@ export const initConfigSchema = z.object({
     })
     .optional()
     .default({ position: "bottom-right", offsetX: 16, offsetY: 16 }),
+  /** When the host URL matches any rule, open the overlay automatically (also on `hashchange` / `popstate`). */
+  autoOpen: autoOpenSchema,
 });
 
 export type InitConfig = z.infer<typeof initConfigSchema>;
+export type AutoOpenConfig = z.infer<typeof autoOpenSchema>;
 export type ThemeMode = z.infer<typeof themeModeSchema>;
 export type Features = z.infer<typeof featuresSchema>;
 export type ChangelogEntry = z.infer<typeof changelogEntrySchema>;

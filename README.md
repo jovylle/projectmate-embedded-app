@@ -58,7 +58,17 @@ The legacy URL [`test.html`](test.html) redirects to **`demo.html`**.
 </script>
 ```
 
-See [`packages/shared-types/src/init-config.ts`](packages/shared-types/src/init-config.ts) for the full config surface (`changelog`, `links`, `theme`, `accentColor`, `feedbackEndpoint`, etc.).
+See [`packages/shared-types/src/init-config.ts`](packages/shared-types/src/init-config.ts) for the full config surface (`changelog`, `links`, `theme`, `accentColor`, `feedbackEndpoint`, **`autoOpen`** for `#hash` / `?query` / `/path` triggers, …).
+
+### URL triggers (`autoOpen`)
+
+Optional `autoOpen` on `ProjectMate.init` opens the overlay when **any** configured rule matches the current URL (rules are **OR**’d):
+
+- **`hash`** — e.g. `"help"` matches `#help` (leading `#` in config is optional).
+- **`query`** — `{ name: "pm", value: "1" }` matches `?pm=1`; omit `value` to match any non-empty param value.
+- **`path`** — e.g. `"/support"` with default `pathMatch: "prefix"` matches `/support` and `/support/…`; use `pathMatch: "exact"` for an exact pathname. Paths must start with `/`. Using `path: "/"` with `prefix` is rejected (would match everything).
+
+Also reacts to **`hashchange`** and **`popstate`** so client navigations can open the overlay without a full reload.
 
 ## Development
 

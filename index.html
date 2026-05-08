@@ -205,6 +205,13 @@
     features: { chat: false, feedback: true, updates: true, issues: false, about: true },
   });
 &lt;/script&gt;</code></pre>
+        <p style="margin-top: 1rem"><strong>Open from a link (optional):</strong> set <code>autoOpen</code> so a hash, query string, or path opens the overlay without clicking the launcher. Each rule is optional; if more than one is set, <strong>any</strong> match (OR) will open.</p>
+        <pre><code>autoOpen: {
+  hash: "help",              // matches #help
+  query: { name: "pm", value: "1" },  // matches ?pm=1
+  path: "/support",          // pathname (default: prefix match, e.g. /support and /support/…)
+  pathMatch: "prefix",       // or "exact"
+}</code></pre>
         <p style="margin-top: 0.85rem; font-size: 0.95rem; color: var(--muted)">
           Full options (changelog, links, accent, <code>feedbackEndpoint</code>, …) are in the repo README and
           <code>packages/shared-types</code>.

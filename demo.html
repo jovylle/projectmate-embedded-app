@@ -21,6 +21,12 @@
     <h1>Host page (demo)</h1>
     <p>This page simulates a normal static site. Use the floating button (bottom-right) to open the overlay.</p>
     <p><strong>Local:</strong> run <code>pnpm build</code> then <code>pnpm demo</code> so scripts load over HTTP.</p>
+    <p>
+      <strong>Auto-open URL triggers (OR):</strong>
+      <a href="#projectmate">#projectmate</a> ·
+      <a href="?projectmate=1">?projectmate=1</a> ·
+      this page’s path (<code>/demo.html</code> locally, <code>/demo.html</code> on Netlify) also opens the overlay on load.
+    </p>
 
     <script src="./apps/embed-sdk/dist/embed.js"></script>
     <script>
@@ -58,6 +64,12 @@
           },
         ],
         launcher: { position: "bottom-right", label: "PM" },
+        autoOpen: {
+          hash: "projectmate",
+          query: { name: "projectmate", value: "1" },
+          path: "/demo.html",
+          pathMatch: "exact",
+        },
       });
     </script>
   </body>

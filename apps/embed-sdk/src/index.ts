@@ -25,6 +25,13 @@ export type InitConfigInput = {
     offsetY?: number;
     label?: string;
   };
+  /** If the current URL matches any rule, open the overlay (also on `hashchange` / `popstate`). Rules are OR'd together. */
+  autoOpen?: {
+    hash?: string;
+    query?: { name: string; value?: string };
+    path?: string;
+    pathMatch?: "exact" | "prefix";
+  };
 };
 
 type NormalizedConfig = InitConfigInput & {
@@ -71,6 +78,7 @@ function normalize(raw: InitConfigInput): NormalizedConfig {
     changelog,
     launcher,
     theme: raw.theme ?? "auto",
+    autoOpen: raw.autoOpen,
   };
 }
 
@@ -93,7 +101,61 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
       throw new Error(`ProjectMate.init: links.${k} must be http(s) URL`);
     }
   }
+  if (raw.autoOpen?.path !== undefined) {
+    const p = raw.autoOpen.path;
+    if (typeof p !== "string" || !p.startsWith("/")) {
+      throw new Error("ProjectMate.init: autoOpen.path must start with /");
+    }
+    if (p === "/" && (raw.autoOpen.pathMatch ?? "prefix") === "prefix") {
+      throw new Error("ProjectMate.init: autoOpen.path '/' cannot use pathMatch 'prefix'");
+    }
+  }
   return normalize(raw);
+}
+
+function stripHash(s: string): string {
+  return s.startsWith("#") ? s.slice(1) : s;
+}
+
+function trimPath(p: string): string {
+  if (p.length > 1 && p.endsWith("/")) return p.replace(/\/+$/, "");
+  return p;
+}
+
+/** True if any configured `autoOpen` rule matches the current `window.location` (OR semantics). */
+function urlMatchesAutoOpen(auto: NonNullable<InitConfigInput["autoOpen"]>): boolean {
+  let matched = false;
+
+  if (auto.hash !== undefined && auto.hash !== "") {
+    const want = stripHash(auto.hash);
+    const cur = stripHash(window.location.hash || "");
+    if (want !== "" && cur === want) matched = true;
+  }
+
+  if (auto.query?.name) {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get(auto.query.name);
+    if (v !== null && v !== "") {
+      if (auto.query.value !== undefined) {
+        if (v === auto.query.value) matched = true;
+      } else {
+        matched = true;
+      }
+    }
+  }
+
+  if (auto.path !== undefined && auto.path !== "") {
+    const pathname = trimPath(window.location.pathname);
+    const want = trimPath(auto.path);
+    const mode = auto.pathMatch ?? "prefix";
+    if (mode === "exact") {
+      if (pathname === want) matched = true;
+    } else {
+      if (pathname === want || pathname.startsWith(`${want}/`)) matched = true;
+    }
+  }
+
+  return matched;
 }
 
 type EmbedState = {
@@ -400,6 +462,22 @@ function bootstrap(raw: InitConfigInput): void {
     },
     true
   );
+
+  function maybeAutoOpenFromUrl(): void {
+    const rule = config.autoOpen;
+    if (!rule) return;
+    if (!urlMatchesAutoOpen(rule)) return;
+    if (!state.open) openOverlay();
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      maybeAutoOpenFromUrl();
+    });
+  });
+
+  window.addEventListener("hashchange", maybeAutoOpenFromUrl);
+  window.addEventListener("popstate", maybeAutoOpenFromUrl);
 }
 
 /** Public entry: SSR-safe, deferred until DOM ready and idle when available. */
