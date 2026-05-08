@@ -330,13 +330,13 @@
         {/if}
         {#if config.host || config.multiHost}
           <section class="pm-section">
-            <h2>Host details</h2>
+            <h2>Workspace details</h2>
             <div class="pm-meta-grid">
               {#if config.host?.name}
-                <p class="pm-meta"><strong>Host:</strong> {config.host.name}</p>
+                <p class="pm-meta"><strong>Workspace:</strong> {config.host.name}</p>
               {/if}
               {#if config.host?.id}
-                <p class="pm-meta"><strong>Host ID:</strong> <code>{config.host.id}</code></p>
+                <p class="pm-meta"><strong>Workspace ID:</strong> <code>{config.host.id}</code></p>
               {/if}
               {#if config.host?.version}
                 <p class="pm-meta"><strong>Version:</strong> <code>{config.host.version}</code></p>
@@ -360,13 +360,13 @@
                 <p class="pm-meta"><strong>Support:</strong> {config.host.supportEmail}</p>
               {/if}
               {#if config.multiHost?.enabled}
-                <p class="pm-meta"><strong>Multi-host:</strong> Enabled</p>
+                <p class="pm-meta"><strong>Portfolio mode:</strong> Enabled</p>
               {/if}
               {#if config.multiHost?.totalHosts}
-                <p class="pm-meta"><strong>Total Hosts:</strong> {config.multiHost.totalHosts}</p>
+                <p class="pm-meta"><strong>Total Workspaces:</strong> {config.multiHost.totalHosts}</p>
               {/if}
               {#if config.multiHost?.activeHostId}
-                <p class="pm-meta"><strong>Active Host:</strong> <code>{config.multiHost.activeHostId}</code></p>
+                <p class="pm-meta"><strong>Active Workspace:</strong> <code>{config.multiHost.activeHostId}</code></p>
               {/if}
               {#if config.multiHost?.benchmarkLabel}
                 <p class="pm-meta"><strong>Benchmark:</strong> {config.multiHost.benchmarkLabel}</p>
