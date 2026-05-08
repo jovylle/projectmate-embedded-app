@@ -19,6 +19,9 @@
   let feedbackBody = $state("");
   let feedbackEmail = $state("");
   let feedbackStatus = $state<"idle" | "sending" | "sent" | "error">("idle");
+  let feedbackScreenshotName = $state<string | null>(null);
+  let feedbackScreenshotDataUrl = $state<string | null>(null);
+  let feedbackFileHint = $state<string | null>(null);
 
   const features = $derived(config?.features);
 
@@ -39,6 +42,15 @@
     if (first && !navItems.some((n) => n.id === section)) {
       section = first;
     }
+  });
+
+  $effect(() => {
+    const c = config;
+    if (!c || c.theme !== "auto") return;
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyTheme(c);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
   });
 
   function applyTheme(c: InitConfig) {
@@ -74,6 +86,36 @@
     }
   }
 
+  const MAX_SCREENSHOT_BYTES = 350_000;
+
+  function onScreenshotPick(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    feedbackFileHint = null;
+    feedbackScreenshotDataUrl = null;
+    feedbackScreenshotName = null;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      feedbackFileHint = "Please choose an image file.";
+      input.value = "";
+      return;
+    }
+    if (file.size > MAX_SCREENSHOT_BYTES) {
+      feedbackFileHint = `Image must be under ${Math.round(MAX_SCREENSHOT_BYTES / 1024)} KB.`;
+      input.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result;
+      if (typeof r === "string") {
+        feedbackScreenshotDataUrl = r;
+        feedbackScreenshotName = file.name;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function submitFeedback() {
     if (!config?.feedbackEndpoint) {
       feedbackStatus = "error";
@@ -85,6 +127,10 @@
         projectId: config.projectId,
         message: feedbackBody,
         email: feedbackEmail || undefined,
+        screenshot:
+          feedbackScreenshotDataUrl && feedbackScreenshotName
+            ? { name: feedbackScreenshotName, dataUrl: feedbackScreenshotDataUrl }
+            : undefined,
         meta: {
           userAgent: navigator.userAgent,
           viewport: { w: window.innerWidth, h: window.innerHeight },
@@ -99,6 +145,9 @@
       if (!res.ok) throw new Error(String(res.status));
       feedbackStatus = "sent";
       feedbackBody = "";
+      feedbackScreenshotDataUrl = null;
+      feedbackScreenshotName = null;
+      feedbackFileHint = null;
     } catch {
       feedbackStatus = "error";
     }
@@ -112,6 +161,9 @@
       const msg = parsed.data;
       if (msg.type === "PM_CLOSE") {
         loadError = null;
+        feedbackScreenshotDataUrl = null;
+        feedbackScreenshotName = null;
+        feedbackFileHint = null;
         return;
       }
       if (msg.type !== "PM_CONFIG") return;
@@ -210,6 +262,18 @@
           <span>Email (optional)</span>
           <input type="email" bind:value={feedbackEmail} placeholder="you@example.com" />
         </label>
+        {#if config.feedbackEndpoint}
+          <label class="pm-field">
+            <span>Screenshot (optional)</span>
+            <input type="file" accept="image/*" onchange={onScreenshotPick} />
+            {#if feedbackScreenshotName}
+              <span class="pm-file-meta">Attached: {feedbackScreenshotName}</span>
+            {/if}
+            {#if feedbackFileHint}
+              <span class="pm-err">{feedbackFileHint}</span>
+            {/if}
+          </label>
+        {/if}
         <div class="pm-actions">
           <button
             type="button"
@@ -459,6 +523,11 @@
 
   .pm-note {
     font-size: 0.9rem;
+    color: var(--pm-muted);
+  }
+
+  .pm-file-meta {
+    font-size: 0.85rem;
     color: var(--pm-muted);
   }
 

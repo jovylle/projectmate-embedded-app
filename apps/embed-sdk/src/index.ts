@@ -198,10 +198,47 @@ function lockScroll(lock: boolean): void {
   }
 }
 
-function init(raw: InitConfigInput): void {
-  if (typeof document === "undefined") {
-    return;
+type InertRestore = { el: HTMLElement; prev: boolean };
+
+function freezeBackground(hostElement: HTMLElement, on: boolean, restores: { list: InertRestore[] }): void {
+  if (on) {
+    restores.list = [];
+    for (const node of Array.from(document.body.children)) {
+      if (!(node instanceof HTMLElement) || node === hostElement) continue;
+      restores.list.push({ el: node, prev: node.inert });
+      node.inert = true;
+    }
+  } else {
+    for (const { el, prev } of restores.list) {
+      el.inert = prev;
+    }
+    restores.list = [];
   }
+}
+
+function scheduleBootstrap(raw: InitConfigInput): void {
+  if (typeof document === "undefined") return;
+
+  const run = () => bootstrap(raw);
+  const ric = (
+    globalThis as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+
+  const enqueue = () => {
+    if (typeof ric === "function") ric(() => run(), { timeout: 2500 });
+    else queueMicrotask(run);
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", enqueue, { once: true });
+  } else {
+    enqueue();
+  }
+}
+
+function bootstrap(raw: InitConfigInput): void {
   if (document.querySelector(`[${ATTR}]`)) {
     console.warn("ProjectMate.init: already initialized");
     return;
@@ -247,6 +284,8 @@ function init(raw: InitConfigInput): void {
   shadow.appendChild(launcher);
   shadow.appendChild(overlay);
 
+  const inertRestores: { list: InertRestore[] } = { list: [] };
+
   const state: EmbedState = {
     config,
     iframeOrigin,
@@ -284,7 +323,9 @@ function init(raw: InitConfigInput): void {
     overlay.hidden = false;
     overlay.classList.add("pm-open");
     launcher.setAttribute("aria-expanded", "true");
+    launcher.tabIndex = -1;
     lockScroll(true);
+    freezeBackground(hostElement, true, inertRestores);
 
     if (!state.iframe) {
       const iframe = document.createElement("iframe");
@@ -316,7 +357,9 @@ function init(raw: InitConfigInput): void {
     overlay.classList.remove("pm-open");
     overlay.hidden = true;
     launcher.setAttribute("aria-expanded", "false");
+    launcher.tabIndex = 0;
     lockScroll(false);
+    freezeBackground(hostElement, false, inertRestores);
     sendToIframe({ v: PROTOCOL_VERSION, type: "PM_CLOSE" });
     state.previouslyFocused?.focus?.();
     state.previouslyFocused = null;
@@ -328,6 +371,9 @@ function init(raw: InitConfigInput): void {
     const data = event.data;
     if (!data || typeof data !== "object") return;
     if (data.v !== PROTOCOL_VERSION) return;
+    if (data.type === "PM_READY") {
+      return;
+    }
     if (data.type === "PM_REQUEST_CLOSE") {
       closeOverlay();
     }
@@ -354,6 +400,12 @@ function init(raw: InitConfigInput): void {
     },
     true
   );
+}
+
+/** Public entry: SSR-safe, deferred until DOM ready and idle when available. */
+function init(raw: InitConfigInput): void {
+  if (typeof document === "undefined") return;
+  scheduleBootstrap(raw);
 }
 
 export { init };

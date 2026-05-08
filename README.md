@@ -46,6 +46,16 @@ See [`packages/shared-types/src/init-config.ts`](packages/shared-types/src/init-
 
 - Overlay app only: `pnpm dev:overlay` (Vite on port 5173). For cross-origin embed testing, point `appUrl` in init at `http://localhost:5173/` and allow that origin in your mental model for `postMessage` (the embed validates the iframe origin against `new URL(appUrl).origin`).
 
+## Isolation and accessibility
+
+- **Shadow DOM**: the launcher and overlay shell live in a shadow tree under a single `body` child, which limits accidental style leakage from the host page. If a host cannot use shadow DOM, treat that as an integration edge case (e.g. open the overlay app in a separate window instead of embedding).
+- **While the overlay is open**, other direct children of `document.body` are marked **`inert`** so background content is skipped for focus and assistive tech, in addition to **scroll locking**. The ProjectMate host node is excluded.
+- **`PM_READY`**: the iframe posts this after validating config; the embed accepts it for a forward-compatible handshake.
+
+## CSP (hosted overlay app)
+
+For the static Vite build, start from something like: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://your-api.example` and add any domains used by `feedbackEndpoint`. Tighten `frame-ancestors` to known embedding origins when you can, instead of `*`.
+
 ## License
 
 Private / TBD.
