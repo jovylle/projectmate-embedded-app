@@ -165,7 +165,7 @@
     if (!accessKey) throw new Error("missing access key");
 
     const subject = w.subject ?? `Feedback — ${c.about?.title ?? c.projectId}`;
-    const fromName = w.fromName ?? "ProjectMate";
+    const fromName = w.fromName ?? c.about?.title ?? c.projectId;
     const viewport = `${window.innerWidth}x${window.innerHeight}`;
 
     const body = {
@@ -285,15 +285,20 @@
   </div>
 {:else if !config}
   <div class="pm-shell pm-loading">
-    <div class="pm-loading-indicator" aria-live="polite" aria-busy="true">
+    <div
+      class="pm-loading-indicator"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label="Loading"
+    >
       <span class="pm-loading-spinner" aria-hidden="true"></span>
-      <p>Loading support...</p>
     </div>
   </div>
 {:else}
   <div class="pm-shell" data-loaded="true">
     <aside class="pm-aside">
-      <button type="button" class="pm-back" onclick={requestClose} aria-label="Back to host site">Back</button>
+      <button type="button" class="pm-back" onclick={requestClose} aria-label="Back to site">Back</button>
       <div class="pm-brand">
         <span class="pm-dot" style:background="var(--pm-accent, #6366f1)"></span>
         <div>
@@ -442,7 +447,7 @@
       {:else if section === "updates" && features?.updates}
         <h1>Updates</h1>
         {#if !config.changelog?.length}
-          <p class="pm-lead">No changelog entries yet. Pass <code>changelog</code> in <code>ProjectMate.init</code>.</p>
+          <p class="pm-lead">No updates to show yet.</p>
         {:else}
           <div class="pm-timeline">
             {#each config.changelog as entry}
@@ -534,17 +539,11 @@
     border: 1px solid var(--pm-border);
     border-radius: 0.85rem;
     background: var(--pm-panel);
-    padding: 1rem 1.15rem;
+    padding: 1.1rem;
     box-shadow: 0 1px 2px var(--pm-shadow);
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    color: var(--pm-muted);
-    font-weight: 600;
-  }
-
-  .pm-loading-indicator p {
-    margin: 0;
+    justify-content: center;
   }
 
   .pm-loading-spinner {

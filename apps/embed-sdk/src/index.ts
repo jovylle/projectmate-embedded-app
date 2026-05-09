@@ -258,13 +258,7 @@ function createStyles(): string {
       display: none;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      gap: 10px;
       background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-      color: #334155;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.01em;
       pointer-events: none;
     }
     .pm-overlay.pm-open[data-loading="true"] .pm-frame-loading {
@@ -424,10 +418,9 @@ function bootstrap(raw: InitConfigInput): void {
   frameLoading.className = "pm-frame-loading";
   const loaderDot = document.createElement("div");
   loaderDot.className = "pm-loader-dot";
-  const loaderText = document.createElement("div");
-  loaderText.textContent = "Loading support…";
+  loaderDot.setAttribute("role", "status");
+  loaderDot.setAttribute("aria-label", "Loading");
   frameLoading.appendChild(loaderDot);
-  frameLoading.appendChild(loaderText);
   frameWrap.appendChild(frameLoading);
   overlay.appendChild(frameWrap);
 
