@@ -1,0 +1,16 @@
+name = "projectmate-issues-api"
+main = "src/index.ts"
+compatibility_date = "2026-05-27"
+
+[vars]
+REQUIRE_IMAGE_APPROVAL = "true"
+
+[[d1_databases]]
+binding = "PROJECTMATE_DB"
+database_name = "projectmate-issues"
+database_id = "replace-with-your-d1-database-id"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PROJECTMATE_ISSUES_BUCKET"
+bucket_name = "projectmate-issues"

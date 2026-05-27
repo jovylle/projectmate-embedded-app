@@ -2,8 +2,23 @@
   "name": "@projectmate/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Placeholder for feedback ingestion, GitHub proxy, and AI chat (Phase 2+).",
+  "type": "module",
+  "description": "Cloudflare Worker API for ProjectMate issue ingestion and moderation.",
   "scripts": {
-    "build": "echo \"No build yet\""
+    "build": "tsc --noEmit",
+    "dev": "wrangler dev src/index.ts",
+    "deploy": "wrangler deploy src/index.ts",
+    "d1:migrate": "wrangler d1 migrations apply PROJECTMATE_DB --local",
+    "test": "vitest run",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@projectmate/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260520.0",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.8",
+    "wrangler": "^4.19.1"
   }
 }

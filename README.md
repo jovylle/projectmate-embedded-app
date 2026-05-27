@@ -40,7 +40,7 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
       modules: {
         feedback: true,
         updates: true,
-        issues: false,
+        issues: true,
         chat: false,
       },
       permissions: {
@@ -63,7 +63,7 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
       chat: false,
       feedback: true,
       updates: true,
-      issues: false,
+      issues: true,
       about: true,
     },
     theme: "auto",
@@ -88,10 +88,10 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
       "Ship, learn, improve.",
       "Clarity beats cleverness.",
     ],
-    // Zero-backend feedback via web3forms.com (free tier). The access key is
-    // public-by-design. Alternatively, set `feedbackEndpoint` to your own API.
-    web3forms: {
-      accessKey: "YOUR-WEB3FORMS-ACCESS-KEY",
+    // Cloudflare Worker endpoint for issue submission/listing/moderation.
+    issuesEndpoint: "https://projectmate-issues-api.example.workers.dev",
+    issueWorkflow: {
+      requireImageApproval: true,
     },
     launcher: {
       position: "bottom-right",
@@ -109,7 +109,7 @@ Add **once** per page (typically before `</body>`). Call **`ProjectMate.init(...
 </script>
 ```
 
-Remove or adjust optional blocks you do not use (`changelog`, `web3forms`, `feedbackEndpoint`, `autoOpen`, etc.). **`projectId`** and **`appUrl`** are required.
+Remove or adjust optional blocks you do not use (`changelog`, `issuesEndpoint`, `feedbackEndpoint`, `autoOpen`, etc.). **`projectId`** and **`appUrl`** are required.
 
 ### Required fields
 
@@ -132,29 +132,29 @@ Remove or adjust optional blocks you do not use (`changelog`, `web3forms`, `feed
 | `multiHost` | Aggregate context for multi-tenant pages: `{ enabled, activeHostId, totalHosts, canSwitchHosts, benchmarkLabel }`. |
 | `changelog` | Static releases: `[{ version, date?, bullets: string[] }]`. |
 | `quotes` | Array of strings; overlay picks one random quote for About on load. |
-| `feedbackEndpoint` | Absolute URL for `POST` JSON feedback (your backend). Omit if you do not collect feedback. |
-| `web3forms` | `{ accessKey, subject?, fromName? }` — zero-backend feedback via [web3forms.com](https://web3forms.com). Takes precedence over `feedbackEndpoint`. |
+| `issuesEndpoint` | Absolute URL for issues API (`POST /issues`, `GET /issues`, moderation routes). |
+| `issueWorkflow` | `{ requireImageApproval?: boolean }` for moderated image visibility defaults. |
+| `feedbackEndpoint` | Backward-compatible fallback endpoint used if `issuesEndpoint` is not provided. |
 | `launcher` | `{ hidden?, position, offsetX, offsetY, label? }` — set `hidden: true` to skip the floating button entirely (use `autoOpen` and/or `ProjectMate.open()` instead). |
 | `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
 
-### Zero-backend feedback (Web3Forms)
+### Cloudflare issues API
 
-If you do not want to run a server just to receive feedback, use [Web3Forms](https://web3forms.com) (free tier: ~250 submissions/month, attachments up to ~5 MB). The access key is **public-by-design** — it is meant to live in client-side code.
+Use a Cloudflare Worker with D1 + R2 to support moderated issue reporting with screenshots.
 
 ```js
 ProjectMate.init({
   projectId: "my-tool",
   appUrl: "https://projectmate.uft1.com/overlay/",
-  features: { feedback: true },
-  web3forms: {
-    accessKey: "YOUR-WEB3FORMS-ACCESS-KEY",
-    subject: "Feedback — My Tool",   // optional
-    fromName: "ProjectMate",          // optional
+  features: { feedback: true, issues: true },
+  issuesEndpoint: "https://projectmate-issues-api.example.workers.dev",
+  issueWorkflow: {
+    requireImageApproval: true,
   },
 });
 ```
 
-The overlay POSTs to `https://api.web3forms.com/submit` with the message, email, screenshot (as an attachment when present), plus `project_id`, `page` (parent URL), `user_agent`, and `viewport` so the resulting email has useful context. If both `web3forms` and `feedbackEndpoint` are set, **`web3forms` wins**. If you use CSP on the overlay app, allow `connect-src https://api.web3forms.com`.
+The overlay sends `POST /issues` for new reports and reads public lists from `GET /issues?projectId=:id&view=open|resolved`. Screenshot issues can stay `pending` until an admin approves them through moderation routes.
 
 ### URL deep links (`autoOpen`)
 
@@ -196,7 +196,7 @@ Programmatic API on the global, available right after `<script src=".../embed.js
 - **Isolation**: launcher + overlay chrome use **shadow DOM**; the real UI runs in an **iframe** (`sandbox` includes scripts, same-origin, forms, popups as needed for the overlay app).
 - **While open**: background `document.body` **siblings** get **`inert`**, scroll is locked, **Escape** closes, focus returns to the launcher when closed.
 - **Back button at the launcher's corner**: when the overlay opens, the floating launcher transforms into a back arrow (`←`) at the same corner it was originally placed, so users can dismiss without travelling to the in-iframe Back button. Hidden when `launcher.hidden: true`.
-- **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON). Web3Forms access keys are **not** secrets (they are public-by-design) and are safe to include.
+- **Do not** pass secrets in `init` — the object is sent to the iframe via `postMessage` (serialized JSON).
 
 ### Content-Security-Policy on the **host** page
 
@@ -205,7 +205,7 @@ If you use CSP, you typically need at least:
 - **`script-src`** — include the origin that serves **`embed.js`**.
 - **`frame-src`** (or a compatible directive in your policy) — include the **overlay** origin from `appUrl`, or the browser may block the iframe.
 
-The **overlay app** has its own CSP when you host it; tune `connect-src` there for `feedbackEndpoint` and any APIs the iframe calls.
+The **overlay app** has its own CSP when you host it; tune `connect-src` there for `issuesEndpoint` (or `feedbackEndpoint` fallback) and any APIs the iframe calls.
 
 ### Full config schema (maintainers / advanced)
 
@@ -218,9 +218,9 @@ Authoritative TypeScript + Zod definitions live in this repo at [`packages/share
 | Path | Role |
 |------|------|
 | [`apps/embed-sdk`](apps/embed-sdk) | Vanilla `embed.js` — `ProjectMate.init({...})`, launcher, fullscreen iframe |
-| [`apps/overlay-app`](apps/overlay-app) | Svelte 5 + Vite + Tailwind — About, Feedback, Updates (Phase 1) |
+| [`apps/overlay-app`](apps/overlay-app) | Svelte 5 + Vite + Tailwind — About, Report Issue, Updates, Issues/Resolved |
 | [`packages/shared-types`](packages/shared-types) | Zod schemas + protocol types for host ↔ iframe |
-| [`apps/api`](apps/api) | Stub / placeholder for future feedback & AI proxy |
+| [`apps/api`](apps/api) | Cloudflare Worker API for issues + moderation (D1 + R2) |
 
 ## Deploying to Netlify
 
@@ -267,7 +267,7 @@ The legacy URL [`test.html`](test.html) redirects to **`demo.html`**.
 
 ## CSP (hosted overlay app)
 
-For the static Vite build, start from something like: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://your-api.example` and add any domains used by `feedbackEndpoint`. Tighten `frame-ancestors` to known embedding origins when you can, instead of `*`.
+For the static Vite build, start from something like: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://your-api.example` and add any domains used by `issuesEndpoint` (or `feedbackEndpoint` fallback). Tighten `frame-ancestors` to known embedding origins when you can, instead of `*`.
 
 ## License
 

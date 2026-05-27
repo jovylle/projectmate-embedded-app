@@ -3,6 +3,9 @@
   import { marked } from "marked";
   import DOMPurify from "dompurify";
   import {
+    issueListResponseSchema,
+    issueModerationResponseSchema,
+    type IssueRecord,
     hostToIframeMessageSchema,
     initConfigSchema,
     PROTOCOL_VERSION,
@@ -18,26 +21,32 @@
   let loadError = $state<string | null>(null);
   let feedbackBody = $state("");
   let feedbackEmail = $state("");
+  let feedbackInteractions = $state("");
   let feedbackStatus = $state<"idle" | "sending" | "sent" | "error">("idle");
   let feedbackScreenshotName = $state<string | null>(null);
   let feedbackScreenshotDataUrl = $state<string | null>(null);
   let feedbackFileHint = $state<string | null>(null);
+  let feedbackErrorDetail = $state<string | null>(null);
+  let issuesView = $state<"open" | "resolved" | "moderation">("open");
+  let issuesLoading = $state(false);
+  let issuesError = $state<string | null>(null);
+  let openIssues = $state<IssueRecord[]>([]);
+  let resolvedIssues = $state<IssueRecord[]>([]);
+  let moderationIssues = $state<IssueRecord[]>([]);
+  let moderationBusyId = $state<string | null>(null);
   let currentQuote = $state<string | null>(null);
 
-  const DEFAULT_WEB3FORMS_ACCESS_KEY = "4a0e9849-ac3e-47bd-a6c6-005fd77823ed";
-
-  const effectiveWeb3formsAccessKey = $derived(
-    config?.web3forms?.accessKey || DEFAULT_WEB3FORMS_ACCESS_KEY
-  );
   const features = $derived(config?.features);
-  const feedbackConfigured = $derived(
-    !!(effectiveWeb3formsAccessKey || config?.feedbackEndpoint)
-  );
-  const canAttachScreenshot = $derived(
-    !!(config?.feedbackEndpoint && !effectiveWeb3formsAccessKey)
-  );
-
-  const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
+  const issuesEndpoint = $derived(config?.issuesEndpoint ?? config?.feedbackEndpoint ?? null);
+  const feedbackConfigured = $derived(!!issuesEndpoint);
+  const canAttachScreenshot = $derived(!!issuesEndpoint);
+  const canModerate = $derived.by(() => {
+    const perms = config?.host?.permissions;
+    if (!perms) return false;
+    if (!Object.prototype.hasOwnProperty.call(perms, "admin")) return false;
+    const adminPerms = perms.admin ?? [];
+    return adminPerms.length > 0;
+  });
 
   const navItems = $derived.by(() => {
     if (!config || !features) return [];
@@ -75,6 +84,11 @@
     }
     const idx = Math.floor(Math.random() * quotes.length);
     currentQuote = quotes[idx] ?? null;
+  });
+
+  $effect(() => {
+    if (!config || section !== "issues" || !features?.issues || !issuesEndpoint) return;
+    void refreshIssues();
   });
 
   function applyTheme(c: InitConfig) {
@@ -140,64 +154,18 @@
     reader.readAsDataURL(file);
   }
 
-  function dataUrlToBlob(dataUrl: string): Blob | null {
-    const match = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
-    if (!match) return null;
-    const mime = match[1] || "application/octet-stream";
-    const isBase64 = !!match[2];
-    const data = match[3] ?? "";
-    try {
-      if (isBase64) {
-        const binary = atob(data);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        return new Blob([bytes], { type: mime });
-      }
-      return new Blob([decodeURIComponent(data)], { type: mime });
-    } catch {
-      return null;
-    }
-  }
-
-  async function submitToWeb3Forms(c: InitConfig): Promise<void> {
-    const w = c.web3forms;
-    const accessKey = w?.accessKey || DEFAULT_WEB3FORMS_ACCESS_KEY;
-    if (!accessKey) throw new Error("missing access key");
-
-    const subject = w.subject ?? `Feedback — ${c.about?.title ?? c.projectId}`;
-    const fromName = w.fromName ?? c.about?.title ?? c.projectId;
-    const viewport = `${window.innerWidth}x${window.innerHeight}`;
-
-    const body = {
-      access_key: accessKey,
-      subject,
-      from_name: fromName,
-      message: feedbackBody,
-      email: feedbackEmail || undefined,
-      project_id: c.projectId,
-      page: parentHref,
-      user_agent: navigator.userAgent,
-      viewport,
-      botcheck: "",
-    };
-    const res = await fetch(WEB3FORMS_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const json = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
-    if (!res.ok || !json?.success) {
-      throw new Error(json?.message || `Web3Forms ${res.status}`);
-    }
-  }
-
-  async function submitToCustomEndpoint(c: InitConfig): Promise<void> {
-    const url = c.feedbackEndpoint!;
+  async function submitIssueToEndpoint(c: InitConfig): Promise<void> {
+    const endpoint = c.issuesEndpoint ?? c.feedbackEndpoint;
+    if (!endpoint) throw new Error("missing issues endpoint");
+    const interactions = feedbackInteractions
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
     const body = {
       projectId: c.projectId,
-      message: feedbackBody,
+      message: feedbackBody.trim(),
       email: feedbackEmail || undefined,
+      interactions,
       screenshot:
         feedbackScreenshotDataUrl && feedbackScreenshotName
           ? { name: feedbackScreenshotName, dataUrl: feedbackScreenshotDataUrl }
@@ -208,34 +176,101 @@
         parentHref,
       },
     };
-    const res = await fetch(url, {
+    const res = await fetch(`${endpoint.replace(/\/$/, "")}/issues`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(String(res.status));
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (!res.ok) throw new Error(json?.error || String(res.status));
   }
 
   async function submitFeedback() {
     if (!config) return;
     if (!feedbackConfigured) {
       feedbackStatus = "error";
+      feedbackErrorDetail = "Issue endpoint is not configured.";
       return;
     }
     feedbackStatus = "sending";
+    feedbackErrorDetail = null;
     try {
-      if (effectiveWeb3formsAccessKey) {
-        await submitToWeb3Forms(config);
-      } else {
-        await submitToCustomEndpoint(config);
-      }
+      await submitIssueToEndpoint(config);
       feedbackStatus = "sent";
       feedbackBody = "";
+      feedbackInteractions = "";
       feedbackScreenshotDataUrl = null;
       feedbackScreenshotName = null;
       feedbackFileHint = null;
+      if (section === "issues" && features?.issues && issuesEndpoint) {
+        await refreshIssues();
+      }
     } catch {
       feedbackStatus = "error";
+      feedbackErrorDetail = "Could not send your report. Check your connection and try again.";
+    }
+  }
+
+  async function fetchIssueList(view: "open" | "resolved"): Promise<IssueRecord[]> {
+    if (!issuesEndpoint || !config) return [];
+    const url = new URL(`${issuesEndpoint.replace(/\/$/, "")}/issues`);
+    url.searchParams.set("projectId", config.projectId);
+    url.searchParams.set("view", view);
+    const res = await fetch(url.toString(), { method: "GET" });
+    if (!res.ok) throw new Error(`failed to load ${view} issues`);
+    const json = issueListResponseSchema.parse(await res.json());
+    return json.items;
+  }
+
+  async function refreshIssues() {
+    if (!issuesEndpoint || !config) return;
+    issuesLoading = true;
+    issuesError = null;
+    try {
+      const [open, resolved] = await Promise.all([fetchIssueList("open"), fetchIssueList("resolved")]);
+      openIssues = open;
+      resolvedIssues = resolved;
+
+      if (canModerate) {
+        const url = new URL(`${issuesEndpoint.replace(/\/$/, "")}/issues/moderation`);
+        url.searchParams.set("projectId", config.projectId);
+        const moderationRes = await fetch(url.toString(), {
+          method: "GET",
+          headers: { "x-projectmate-role": "admin", "x-projectmate-admin": "true" },
+        });
+        if (moderationRes.ok) {
+          const json = issueModerationResponseSchema.parse(await moderationRes.json());
+          moderationIssues = json.items;
+        } else {
+          moderationIssues = [];
+        }
+      } else {
+        moderationIssues = [];
+      }
+    } catch {
+      issuesError = "Could not load issues right now.";
+    } finally {
+      issuesLoading = false;
+    }
+  }
+
+  async function updateIssueStatus(issueId: string, status: "approved_open" | "resolved" | "rejected") {
+    if (!issuesEndpoint || !canModerate) return;
+    moderationBusyId = issueId;
+    try {
+      const res = await fetch(`${issuesEndpoint.replace(/\/$/, "")}/issues/${issueId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-projectmate-role": "admin",
+          "x-projectmate-admin": "true",
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      await refreshIssues();
+    } finally {
+      moderationBusyId = null;
     }
   }
 
@@ -247,9 +282,14 @@
       const msg = parsed.data;
       if (msg.type === "PM_CLOSE") {
         loadError = null;
+        feedbackBody = "";
+        feedbackEmail = "";
+        feedbackInteractions = "";
+        feedbackStatus = "idle";
         feedbackScreenshotDataUrl = null;
         feedbackScreenshotName = null;
         feedbackFileHint = null;
+        feedbackErrorDetail = null;
         return;
       }
       if (msg.type !== "PM_CONFIG") return;
@@ -402,18 +442,26 @@
           </section>
         {/each}
       {:else if section === "feedback" && features?.feedback}
-        <h1>Feedback</h1>
-        <p class="pm-lead">Tell us what broke, what confused you, or what you want next.</p>
+        <h1>Report an issue</h1>
+        <p class="pm-lead">Share what happened, include reproduction steps, and attach a screenshot if needed.</p>
         {#if !feedbackConfigured}
-          <p class="pm-note">No feedback destination configured — form is display-only for now.</p>
+          <p class="pm-note">Issue submission is not configured yet for this workspace.</p>
         {/if}
         <label class="pm-field">
           <span>Message</span>
-          <textarea bind:value={feedbackBody} rows="6" placeholder="Your feedback…"></textarea>
+          <textarea bind:value={feedbackBody} rows="6" placeholder="What went wrong?"></textarea>
         </label>
         <label class="pm-field">
           <span>Email (optional)</span>
           <input type="email" bind:value={feedbackEmail} placeholder="you@example.com" />
+        </label>
+        <label class="pm-field">
+          <span>Interaction notes (optional)</span>
+          <textarea
+            bind:value={feedbackInteractions}
+            rows="4"
+            placeholder="One step per line, e.g.&#10;1) Opened dashboard&#10;2) Clicked Save&#10;3) Error appeared"
+          ></textarea>
         </label>
         {#if feedbackConfigured && canAttachScreenshot}
           <label class="pm-field">
@@ -426,8 +474,6 @@
               <span class="pm-err">{feedbackFileHint}</span>
             {/if}
           </label>
-        {:else if effectiveWeb3formsAccessKey}
-          <p class="pm-note">File attachments are unavailable on the current Web3Forms plan.</p>
         {/if}
         <div class="pm-actions">
           <button
@@ -439,9 +485,9 @@
             {feedbackStatus === "sending" ? "Sending…" : "Send"}
           </button>
           {#if feedbackStatus === "sent"}
-            <span class="pm-success">Thanks — received.</span>
+            <span class="pm-success">Thanks — your issue has been received.</span>
           {:else if feedbackStatus === "error"}
-            <span class="pm-err">Could not send. Check the destination or your network.</span>
+            <span class="pm-err">{feedbackErrorDetail ?? "Could not send right now."}</span>
           {/if}
         </div>
       {:else if section === "updates" && features?.updates}
@@ -470,7 +516,172 @@
         <p class="pm-lead">AI chat is planned for Phase 2.</p>
       {:else if section === "issues" && features?.issues}
         <h1>Issues</h1>
-        <p class="pm-lead">GitHub issues integration is planned for Phase 2.</p>
+        <p class="pm-lead">Track approved issues, resolved fixes, and moderation updates for this workspace.</p>
+        {#if !issuesEndpoint}
+          <p class="pm-note">Issue listing is not configured yet for this workspace.</p>
+        {:else}
+          <label class="pm-field">
+            <span>Report a new issue</span>
+            <textarea bind:value={feedbackBody} rows="4" placeholder="Share the problem you hit..."></textarea>
+          </label>
+          <label class="pm-field">
+            <span>Interaction notes (optional)</span>
+            <textarea bind:value={feedbackInteractions} rows="3" placeholder="Steps to reproduce"></textarea>
+          </label>
+          <label class="pm-field">
+            <span>Screenshot (optional)</span>
+            <input type="file" accept="image/*" onchange={onScreenshotPick} />
+            {#if feedbackScreenshotName}
+              <span class="pm-file-meta">Attached: {feedbackScreenshotName}</span>
+            {/if}
+            {#if feedbackFileHint}
+              <span class="pm-err">{feedbackFileHint}</span>
+            {/if}
+          </label>
+          <div class="pm-actions">
+            <button
+              type="button"
+              class="pm-primary"
+              disabled={!feedbackBody.trim() || feedbackStatus === "sending"}
+              onclick={submitFeedback}
+            >
+              {feedbackStatus === "sending" ? "Sending…" : "Submit issue"}
+            </button>
+            {#if feedbackStatus === "sent"}
+              <span class="pm-success">Issue submitted. Refreshing list…</span>
+            {:else if feedbackStatus === "error"}
+              <span class="pm-err">{feedbackErrorDetail ?? "Could not submit issue."}</span>
+            {/if}
+          </div>
+
+          <div class="pm-tabs">
+            <button
+              type="button"
+              class="pm-tab-btn"
+              class:active={issuesView === "open"}
+              onclick={() => (issuesView = "open")}
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              class="pm-tab-btn"
+              class:active={issuesView === "resolved"}
+              onclick={() => (issuesView = "resolved")}
+            >
+              Resolved
+            </button>
+            {#if canModerate}
+              <button
+                type="button"
+                class="pm-tab-btn"
+                class:active={issuesView === "moderation"}
+                onclick={() => (issuesView = "moderation")}
+              >
+                Moderation
+              </button>
+            {/if}
+          </div>
+
+          {#if issuesLoading}
+            <p class="pm-note">Loading issues…</p>
+          {:else if issuesError}
+            <p class="pm-note">{issuesError}</p>
+          {:else if issuesView === "open"}
+            {#if !openIssues.length}
+              <p class="pm-note">No open issues are public yet.</p>
+            {:else}
+              <div class="pm-issue-list">
+                {#each openIssues as item}
+                  <article class="pm-issue">
+                    <p class="pm-issue-body">{item.message}</p>
+                    <p class="pm-issue-meta">{new Date(item.createdAt).toLocaleString()}</p>
+                    {#if item.interactions.length}
+                      <ul class="pm-issue-steps">
+                        {#each item.interactions as step}
+                          <li>{step}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                    {#if item.hasScreenshot && item.screenshotPath}
+                      <img
+                        class="pm-issue-img"
+                        src={`${issuesEndpoint.replace(/\/$/, "")}${item.screenshotPath}`}
+                        alt="Issue screenshot"
+                        loading="lazy"
+                      />
+                    {/if}
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          {:else if issuesView === "resolved"}
+            {#if !resolvedIssues.length}
+              <p class="pm-note">No resolved issues yet.</p>
+            {:else}
+              <div class="pm-issue-list">
+                {#each resolvedIssues as item}
+                  <article class="pm-issue">
+                    <p class="pm-issue-body">{item.message}</p>
+                    <p class="pm-issue-meta">
+                      Resolved {item.resolvedAt ? new Date(item.resolvedAt).toLocaleString() : "recently"}
+                    </p>
+                    {#if item.hasScreenshot && item.screenshotPath}
+                      <img
+                        class="pm-issue-img"
+                        src={`${issuesEndpoint.replace(/\/$/, "")}${item.screenshotPath}`}
+                        alt="Resolved issue screenshot"
+                        loading="lazy"
+                      />
+                    {/if}
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          {:else}
+            {#if !moderationIssues.length}
+              <p class="pm-note">No moderation items pending.</p>
+            {:else}
+              <div class="pm-issue-list">
+                {#each moderationIssues as item}
+                  <article class="pm-issue">
+                    <p class="pm-issue-body">{item.message}</p>
+                    <p class="pm-issue-meta">Status: {item.status}</p>
+                    {#if item.hasScreenshot}
+                      <p class="pm-note">Contains screenshot. Approve before it appears publicly.</p>
+                    {/if}
+                    <div class="pm-actions">
+                      <button
+                        type="button"
+                        class="pm-primary"
+                        disabled={moderationBusyId === item.id}
+                        onclick={() => updateIssueStatus(item.id, "approved_open")}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        class="pm-secondary"
+                        disabled={moderationBusyId === item.id}
+                        onclick={() => updateIssueStatus(item.id, "resolved")}
+                      >
+                        Resolve
+                      </button>
+                      <button
+                        type="button"
+                        class="pm-secondary"
+                        disabled={moderationBusyId === item.id}
+                        onclick={() => updateIssueStatus(item.id, "rejected")}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          {/if}
+        {/if}
       {:else}
         <p class="pm-lead">This section is disabled.</p>
       {/if}
@@ -821,6 +1032,22 @@
     cursor: not-allowed;
   }
 
+  .pm-secondary {
+    border: 1px solid var(--pm-border);
+    border-radius: 0.45rem;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    color: var(--pm-text);
+    background: var(--pm-panel);
+  }
+
+  .pm-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .pm-success {
     color: #22c55e;
     font-size: 0.9rem;
@@ -843,6 +1070,69 @@
   .pm-file-meta {
     font-size: 0.85rem;
     color: var(--pm-muted);
+  }
+
+  .pm-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .pm-tab-btn {
+    border: 1px solid var(--pm-border);
+    border-radius: 0.5rem;
+    background: var(--pm-panel);
+    color: var(--pm-text);
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .pm-tab-btn.active {
+    border-color: color-mix(in oklab, var(--pm-accent, #6366f1) 45%, var(--pm-border));
+    background: color-mix(in oklab, var(--pm-accent, #6366f1) 12%, var(--pm-panel));
+  }
+
+  .pm-issue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .pm-issue {
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0.9rem 1rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+  }
+
+  .pm-issue-body {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+
+  .pm-issue-meta {
+    margin: 0.45rem 0 0;
+    font-size: 0.83rem;
+    color: var(--pm-muted);
+  }
+
+  .pm-issue-steps {
+    margin: 0.55rem 0 0;
+    padding-left: 1.15rem;
+    color: var(--pm-muted);
+    font-size: 0.88rem;
+  }
+
+  .pm-issue-img {
+    display: block;
+    margin-top: 0.7rem;
+    width: 100%;
+    max-width: 520px;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.6rem;
+    background: var(--pm-subtle);
   }
 
   .pm-timeline {

@@ -8,6 +8,27 @@ export type InitConfigInput = {
   about?: { title: string; description: string };
   links?: Record<string, string>;
   customSections?: { title: string; content: string }[];
+  host?: {
+    id: string;
+    name: string;
+    version: string;
+    environment?: "development" | "staging" | "production";
+    plan?: string;
+    region?: string;
+    locale?: string;
+    timezone?: string;
+    supportEmail?: string;
+    modules?: Record<string, boolean>;
+    permissions?: Record<string, string[]>;
+  };
+  multiHost?: {
+    enabled?: boolean;
+    activeHostId?: string;
+    totalHosts?: number;
+    canSwitchHosts?: boolean;
+    benchmarkLabel?: string;
+  };
+  quotes?: string[];
   features?: {
     chat?: boolean;
     feedback?: boolean;
@@ -18,6 +39,10 @@ export type InitConfigInput = {
   theme?: "light" | "dark" | "auto";
   accentColor?: string;
   feedbackEndpoint?: string;
+  issuesEndpoint?: string;
+  issueWorkflow?: {
+    requireImageApproval?: boolean;
+  };
   web3forms?: {
     accessKey: string;
     subject?: string;
@@ -103,6 +128,11 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
       throw new Error("ProjectMate.init: feedbackEndpoint must be http(s) URL when set");
     }
   }
+  if (raw.issuesEndpoint !== undefined) {
+    if (typeof raw.issuesEndpoint !== "string" || !isHttpUrl(raw.issuesEndpoint)) {
+      throw new Error("ProjectMate.init: issuesEndpoint must be http(s) URL when set");
+    }
+  }
   if (raw.web3forms !== undefined) {
     const w = raw.web3forms;
     if (!w || typeof w !== "object") {
@@ -112,9 +142,7 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
       throw new Error("ProjectMate.init: web3forms.accessKey (string) required");
     }
     if (raw.feedbackEndpoint) {
-      console.warn(
-        "ProjectMate.init: both `web3forms` and `feedbackEndpoint` set; web3forms takes precedence."
-      );
+      console.warn("ProjectMate.init: both `web3forms` and `feedbackEndpoint` set.");
     }
   }
   const links = raw.links ?? {};
@@ -131,6 +159,11 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
     if (p === "/" && (raw.autoOpen.pathMatch ?? "prefix") === "prefix") {
       throw new Error("ProjectMate.init: autoOpen.path '/' cannot use pathMatch 'prefix'");
     }
+  }
+  if (raw.features?.issues && !raw.issuesEndpoint && !raw.feedbackEndpoint) {
+    console.warn(
+      "ProjectMate.init: `features.issues` is enabled but neither `issuesEndpoint` nor `feedbackEndpoint` is set."
+    );
   }
   return normalize(raw);
 }

@@ -44,7 +44,7 @@
           locale: "en-US",
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           supportEmail: "support@example.com",
-          modules: { about: true, feedback: true, updates: true, issues: false, chat: false },
+          modules: { about: true, feedback: true, updates: true, issues: true, chat: false },
           permissions: {
             admin: ["view", "manage", "publish"],
             viewer: ["view"],
@@ -79,9 +79,11 @@
           chat: false,
           feedback: true,
           updates: true,
-          issues: false,
+          issues: true,
           about: true,
         },
+        issuesEndpoint: "https://projectmate-issues-api.example.workers.dev",
+        issueWorkflow: { requireImageApproval: true },
         theme: "auto",
         accentColor: "#6366f1",
         changelog: [

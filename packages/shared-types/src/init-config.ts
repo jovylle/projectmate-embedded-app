@@ -102,6 +102,15 @@ export const initConfigSchema = z.object({
   accentColor: z.string().optional(),
   /** Optional feedback POST URL (BYO backend) */
   feedbackEndpoint: z.string().url().optional(),
+  /** Optional issues API base URL. When set, issue submission/list/moderation can be enabled. */
+  issuesEndpoint: z.string().url().optional(),
+  issueWorkflow: z
+    .object({
+      /** Require explicit admin approval before screenshot issues are publicly visible. */
+      requireImageApproval: z.boolean().optional().default(true),
+    })
+    .optional()
+    .default({ requireImageApproval: true }),
   /**
    * Optional Web3Forms config — zero-backend feedback via web3forms.com.
    * The `accessKey` is public-by-design; the overlay will POST to
