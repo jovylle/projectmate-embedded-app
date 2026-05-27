@@ -8,7 +8,7 @@ REQUIRE_IMAGE_APPROVAL = "true"
 [[d1_databases]]
 binding = "PROJECTMATE_DB"
 database_name = "projectmate-issues"
-database_id = "replace-with-your-d1-database-id"
+database_id = "a67d6b89-0476-499d-913d-4c3eb9706e40"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
