@@ -10,7 +10,9 @@
     initConfigSchema,
     PROTOCOL_VERSION,
     type InitConfig,
+    type HostSession,
   } from "@projectmate/shared-types";
+  import { submitWeb3FormsFeedback } from "./web3forms";
 
   type Section = "about" | "feedback" | "updates" | "chat" | "issues";
 
@@ -35,17 +37,42 @@
   let moderationIssues = $state<IssueRecord[]>([]);
   let moderationBusyId = $state<string | null>(null);
   let currentQuote = $state<string | null>(null);
+  let hostSession = $state<HostSession | null>(null);
+  let hostSessionBridgeActive = $state(false);
 
   const features = $derived(config?.features);
   const issuesEndpoint = $derived(config?.issuesEndpoint ?? config?.feedbackEndpoint ?? null);
-  const feedbackConfigured = $derived(!!issuesEndpoint);
-  const canAttachScreenshot = $derived(!!issuesEndpoint);
-  const canModerate = $derived.by(() => {
+  const web3formsAccessKey = $derived(config?.web3forms?.accessKey?.trim() || null);
+  const useWeb3Forms = $derived(!!web3formsAccessKey);
+  const feedbackConfigured = $derived(!!issuesEndpoint || !!web3formsAccessKey);
+  const canAttachScreenshot = $derived(!!issuesEndpoint && !useWeb3Forms);
+  const legacyCanModerate = $derived.by(() => {
     const perms = config?.host?.permissions;
     if (!perms) return false;
     if (!Object.prototype.hasOwnProperty.call(perms, "admin")) return false;
     const adminPerms = perms.admin ?? [];
     return adminPerms.length > 0;
+  });
+
+  const canPost = $derived.by(() => {
+    if (hostSessionBridgeActive) return hostSession?.capabilities.canPost ?? false;
+    return true;
+  });
+
+  const canModerate = $derived.by(() => {
+    if (hostSessionBridgeActive) return hostSession?.capabilities.canModerate ?? false;
+    return legacyCanModerate;
+  });
+
+  const canViewModeration = $derived.by(() => {
+    if (hostSessionBridgeActive) return hostSession?.capabilities.canViewModeration ?? false;
+    return legacyCanModerate;
+  });
+
+  const postingAsLabel = $derived.by(() => {
+    if (!hostSessionBridgeActive) return null;
+    if (!hostSession) return "Guest";
+    return hostSession.user.displayName;
   });
 
   const navItems = $derived.by(() => {
@@ -157,10 +184,7 @@
   async function submitIssueToEndpoint(c: InitConfig): Promise<void> {
     const endpoint = c.issuesEndpoint ?? c.feedbackEndpoint;
     if (!endpoint) throw new Error("missing issues endpoint");
-    const interactions = feedbackInteractions
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const interactions = feedbackInteractionLines();
     const body = {
       projectId: c.projectId,
       message: feedbackBody.trim(),
@@ -185,17 +209,42 @@
     if (!res.ok) throw new Error(json?.error || String(res.status));
   }
 
+  function feedbackInteractionLines(): string[] {
+    return feedbackInteractions
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   async function submitFeedback() {
     if (!config) return;
+    if (!canPost) {
+      feedbackStatus = "error";
+      feedbackErrorDetail = hostSessionBridgeActive
+        ? "You do not have permission to post from this account."
+        : "Posting is not available.";
+      return;
+    }
     if (!feedbackConfigured) {
       feedbackStatus = "error";
-      feedbackErrorDetail = "Issue endpoint is not configured.";
+      feedbackErrorDetail = "Feedback is not configured for this workspace.";
       return;
     }
     feedbackStatus = "sending";
     feedbackErrorDetail = null;
     try {
-      await submitIssueToEndpoint(config);
+      if (useWeb3Forms) {
+        await submitWeb3FormsFeedback(config, {
+          message: feedbackBody.trim(),
+          email: feedbackEmail || undefined,
+          interactions: feedbackInteractionLines(),
+          parentHref,
+        });
+      } else if (issuesEndpoint) {
+        await submitIssueToEndpoint(config);
+      } else {
+        throw new Error("feedback not configured");
+      }
       feedbackStatus = "sent";
       feedbackBody = "";
       feedbackInteractions = "";
@@ -205,9 +254,13 @@
       if (section === "issues" && features?.issues && issuesEndpoint) {
         await refreshIssues();
       }
-    } catch {
+    } catch (err) {
       feedbackStatus = "error";
-      feedbackErrorDetail = "Could not send your report. Check your connection and try again.";
+      const detail = err instanceof Error ? err.message : null;
+      feedbackErrorDetail =
+        detail && detail.length < 200
+          ? detail
+          : "Could not send your report. Check your connection and try again.";
     }
   }
 
@@ -231,7 +284,7 @@
       openIssues = open;
       resolvedIssues = resolved;
 
-      if (canModerate) {
+      if (canViewModeration) {
         const url = new URL(`${issuesEndpoint.replace(/\/$/, "")}/issues/moderation`);
         url.searchParams.set("projectId", config.projectId);
         const moderationRes = await fetch(url.toString(), {
@@ -280,6 +333,15 @@
       if (!parsed.success) return;
 
       const msg = parsed.data;
+      if (msg.type === "PM_HOST_SESSION") {
+        hostSessionBridgeActive = true;
+        hostSession = msg.payload.session;
+        if (config && section === "issues" && config.features?.issues && issuesEndpoint) {
+          void refreshIssues();
+        }
+        return;
+      }
+
       if (msg.type === "PM_CLOSE") {
         loadError = null;
         feedbackBody = "";
@@ -346,6 +408,24 @@
           <div class="pm-sub">Community support</div>
         </div>
       </div>
+      {#if postingAsLabel !== null}
+        <div class="pm-session" class:pm-session--guest={!hostSession}>
+          {#if hostSession?.user.avatarUrl}
+            <img class="pm-session-avatar" src={hostSession.user.avatarUrl} alt="" />
+          {:else}
+            <span class="pm-session-avatar pm-session-avatar--placeholder" aria-hidden="true">
+              {postingAsLabel.slice(0, 1).toUpperCase()}
+            </span>
+          {/if}
+          <div class="pm-session-copy">
+            <div class="pm-session-kicker">Posting as</div>
+            <div class="pm-session-name">{postingAsLabel}</div>
+            {#if !hostSession}
+              <div class="pm-session-hint">Sign in on the host site to post.</div>
+            {/if}
+          </div>
+        </div>
+      {/if}
       <nav class="pm-nav">
         {#each navItems as item}
           <button
@@ -479,7 +559,7 @@
           <button
             type="button"
             class="pm-primary"
-            disabled={!feedbackConfigured || !feedbackBody.trim() || feedbackStatus === "sending"}
+            disabled={!canPost || !feedbackConfigured || !feedbackBody.trim() || feedbackStatus === "sending"}
             onclick={submitFeedback}
           >
             {feedbackStatus === "sending" ? "Sending…" : "Send"}
@@ -542,7 +622,7 @@
             <button
               type="button"
               class="pm-primary"
-              disabled={!feedbackBody.trim() || feedbackStatus === "sending"}
+              disabled={!canPost || !feedbackBody.trim() || feedbackStatus === "sending"}
               onclick={submitFeedback}
             >
               {feedbackStatus === "sending" ? "Sending…" : "Submit issue"}
@@ -571,7 +651,7 @@
             >
               Resolved
             </button>
-            {#if canModerate}
+            {#if canViewModeration}
               <button
                 type="button"
                 class="pm-tab-btn"
@@ -634,6 +714,22 @@
                         loading="lazy"
                       />
                     {/if}
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          {:else if !canViewModeration}
+            <p class="pm-note">You do not have access to moderation for this workspace.</p>
+          {:else if !canModerate}
+            <p class="pm-note">Moderation is view-only for your account.</p>
+            {#if !moderationIssues.length}
+              <p class="pm-note">No moderation items pending.</p>
+            {:else}
+              <div class="pm-issue-list">
+                {#each moderationIssues as item}
+                  <article class="pm-issue">
+                    <p class="pm-issue-body">{item.message}</p>
+                    <p class="pm-issue-meta">Status: {item.status}</p>
                   </article>
                 {/each}
               </div>
@@ -831,6 +927,66 @@
     font-size: 0.75rem;
     color: var(--pm-muted);
     margin-top: 0.1rem;
+  }
+
+  .pm-session {
+    display: flex;
+    gap: 0.65rem;
+    align-items: center;
+    border: 1px solid var(--pm-border);
+    border-radius: 0.75rem;
+    background: var(--pm-panel);
+    padding: 0.7rem 0.8rem;
+    box-shadow: 0 1px 2px var(--pm-shadow);
+  }
+
+  .pm-session--guest {
+    border-style: dashed;
+  }
+
+  .pm-session-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .pm-session-avatar--placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in oklab, var(--pm-accent, #6366f1) 18%, var(--pm-subtle));
+    color: var(--pm-text);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .pm-session-copy {
+    min-width: 0;
+  }
+
+  .pm-session-kicker {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pm-muted);
+  }
+
+  .pm-session-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pm-session-hint {
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--pm-muted);
+    line-height: 1.35;
   }
 
   .pm-nav {

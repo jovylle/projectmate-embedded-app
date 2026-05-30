@@ -101,6 +101,21 @@
           pathMatch: "exact",
         },
       });
+
+      ProjectMate.setSession({
+        user: {
+          id: "demo-user",
+          displayName: "Demo User",
+          roles: ["member", "admin"],
+        },
+        capabilities: {
+          canPost: true,
+          canComment: true,
+          canModerate: true,
+          canViewModeration: true,
+        },
+        issuedAt: new Date().toISOString(),
+      });
     </script>
   </body>
 </html>

@@ -137,14 +137,41 @@ Remove or adjust optional blocks you do not use (`changelog`, `issuesEndpoint`, 
 | `issuesEndpoint` | Absolute URL for issues API (`POST /issues`, `GET /issues`, moderation routes). |
 | `issueWorkflow` | `{ requireImageApproval?: boolean }` for moderated image visibility defaults. |
 | `feedbackEndpoint` | Backward-compatible fallback endpoint used if `issuesEndpoint` is not provided. |
+| `web3forms` | Client-side feedback via [Web3Forms](https://web3forms.com): `{ accessKey, subject?, fromName? }`. The overlay POSTs to `https://api.web3forms.com/submit` from the iframe (free plan). Takes precedence over `feedbackEndpoint` when both are set. |
 | `launcher` | `{ hidden?, position, offsetX, offsetY, label? }` — set `hidden: true` to skip the floating button entirely (use `autoOpen` and/or `ProjectMate.open()` instead). |
 | `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
 
-### Minimum issue submission setup
+### Minimum feedback setup
 
-If you see `Issue submission is not configured yet for this workspace.`, your init config is missing both `issuesEndpoint` and `feedbackEndpoint`.
+If you see `Issue submission is not configured yet for this workspace.`, feedback is not wired up. Use **one** of:
 
-Minimum working setup:
+1. **Web3Forms (no backend)** — `web3forms.accessKey` + `features.feedback: true` (no `issuesEndpoint` / `feedbackEndpoint`).
+2. **BYO API** — `issuesEndpoint` or `feedbackEndpoint` + `features.feedback: true` (and/or `features.issues: true`).
+
+#### Web3Forms (client-side, free plan)
+
+Submissions run from the **hosted overlay origin** (e.g. `https://projectmate.uft1.com`), not from your site’s server. Web3Forms blocks server/proxy IPs on the free plan.
+
+```js
+ProjectMate.init({
+  projectId: "sfl-crab",
+  appUrl: "https://projectmate.uft1.com/overlay/",
+  features: { feedback: true, issues: false, updates: true, about: true, chat: false },
+  web3forms: {
+    accessKey: "<WEB3FORMS_ACCESS_KEY>",
+    subject: "SFL Crab feedback",
+    fromName: "d1g.uk",
+  },
+});
+```
+
+- **CORS:** Web3Forms allows browser `fetch` from any origin by default; use `Content-Type: application/json`. If you enable **domain lock** on the key (Pro), allow your embed origins (e.g. `d1g.uk`, `beta.d1g.uk`) and **`projectmate.uft1.com`** (iframe submit origin).
+- **CSP:** On the overlay host, add `https://api.web3forms.com` to `connect-src` (see CSP section below).
+- **Screenshots:** Not sent via Web3Forms JSON on the free tier (endpoint mode still supports them via `POST /issues`).
+
+When both `web3forms` and `feedbackEndpoint` are set, the overlay uses Web3Forms for Feedback submit.
+
+#### BYO issues API
 
 - Keep required fields: `projectId` and `appUrl`
 - Enable at least one entry surface: `features.feedback: true` or `features.issues: true`
@@ -210,6 +237,7 @@ Programmatic API on the global, available right after `<script src=".../embed.js
 - `ProjectMate.close()` — close the overlay
 - `ProjectMate.toggle()` — toggle state
 - `ProjectMate.isOpen()` — current open state (false before bootstrap)
+- `ProjectMate.setSession(session | null)` — push host auth into the iframe (`PM_HOST_SESSION`); pass `null` to clear. Safe before `init` finishes (queued). Session shape matches [`projectmate-hub` shared-types](https://github.com/jovylle/projectmate-hub/tree/master/packages/shared-types) (`user`, `capabilities`, optional `issuedAt`).
 
 ### Behaviour and constraints
 
@@ -227,7 +255,7 @@ If you use CSP, you typically need at least:
 - **`script-src`** — include the origin that serves **`embed.js`**.
 - **`frame-src`** (or a compatible directive in your policy) — include the **overlay** origin from `appUrl`, or the browser may block the iframe.
 
-The **overlay app** has its own CSP when you host it; tune `connect-src` there for `issuesEndpoint` (or `feedbackEndpoint` fallback) and any APIs the iframe calls.
+The **overlay app** has its own CSP when you host it; tune `connect-src` there for `issuesEndpoint` (or `feedbackEndpoint` fallback), `https://api.web3forms.com` when using `web3forms`, and any other APIs the iframe calls.
 
 ### Full config schema (maintainers / advanced)
 
@@ -289,7 +317,7 @@ The legacy URL [`test.html`](test.html) redirects to **`demo.html`**.
 
 ## CSP (hosted overlay app)
 
-For the static Vite build, start from something like: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://your-api.example` and add any domains used by `issuesEndpoint` (or `feedbackEndpoint` fallback). Tighten `frame-ancestors` to known embedding origins when you can, instead of `*`.
+For the static Vite build, start from something like: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://your-api.example https://api.web3forms.com` and add any domains used by `issuesEndpoint` (or `feedbackEndpoint` fallback). Tighten `frame-ancestors` to known embedding origins when you can, instead of `*`.
 
 ## License
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { initConfigSchema } from "./init-config.js";
+import { hostSessionSchema } from "./session.js";
 
 export const PROTOCOL_VERSION = 1 as const;
 
@@ -17,6 +18,13 @@ export const hostToIframeMessageSchema = z.discriminatedUnion("type", [
     v: z.literal(PROTOCOL_VERSION),
     type: z.literal("PM_CLOSE"),
     payload: z.object({}).optional(),
+  }),
+  z.object({
+    v: z.literal(PROTOCOL_VERSION),
+    type: z.literal("PM_HOST_SESSION"),
+    payload: z.object({
+      session: hostSessionSchema.nullable(),
+    }),
   }),
 ]);
 

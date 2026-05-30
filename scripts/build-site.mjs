@@ -11,6 +11,12 @@ await mkdir(join(out, "overlay"), { recursive: true });
 await cp(join(root, "apps/overlay-app/dist"), join(out, "overlay"), { recursive: true });
 await cp(join(root, "apps/embed-sdk/dist/embed.js"), join(out, "embed.js"));
 
+try {
+  await cp(join(root, "site/_headers"), join(out, "_headers"));
+} catch {
+  // optional Netlify headers (Web3Forms connect-src, etc.)
+}
+
 const indexHtml = await readFile(join(root, "index.html"), "utf8");
 await writeFile(join(out, "index.html"), indexHtml);
 

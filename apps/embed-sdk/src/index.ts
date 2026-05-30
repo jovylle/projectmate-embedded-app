@@ -1,6 +1,23 @@
 /** Protocol version — keep in sync with @projectmate/shared-types */
 const PROTOCOL_VERSION = 1 as const;
 
+export type HostSessionInput = {
+  user: {
+    id: string;
+    displayName: string;
+    email?: string;
+    avatarUrl?: string;
+    roles?: string[];
+  };
+  capabilities?: {
+    canPost?: boolean;
+    canComment?: boolean;
+    canModerate?: boolean;
+    canViewModeration?: boolean;
+  };
+  issuedAt?: string;
+};
+
 export type InitConfigInput = {
   projectId: string;
   appUrl: string;
@@ -163,6 +180,12 @@ function assertConfig(raw: InitConfigInput): NormalizedConfig {
   if (raw.features?.issues && !raw.issuesEndpoint && !raw.feedbackEndpoint) {
     console.warn(
       "ProjectMate.init: `features.issues` is enabled but neither `issuesEndpoint` nor `feedbackEndpoint` is set."
+    );
+  }
+  const hasWeb3Forms = !!(raw.web3forms?.accessKey && String(raw.web3forms.accessKey).trim());
+  if (raw.features?.feedback && !raw.issuesEndpoint && !raw.feedbackEndpoint && !hasWeb3Forms) {
+    console.warn(
+      "ProjectMate.init: `features.feedback` is enabled but no `web3forms`, `issuesEndpoint`, or `feedbackEndpoint` is set."
     );
   }
   return normalize(raw);
@@ -370,6 +393,64 @@ type EmbedAPI = {
 
 let currentInstance: EmbedAPI | null = null;
 let pendingAction: "open" | "close" | "toggle" | null = null;
+let pendingSession: HostSessionInput | null | undefined = undefined;
+let pushSessionToIframe: ((session: HostSessionInput | null) => void) | null = null;
+
+function isHttpUrlOptional(s: string): boolean {
+  try {
+    const u = new URL(s);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function normalizeHostSession(raw: HostSessionInput): HostSessionInput {
+  const caps = raw.capabilities ?? {};
+  return {
+    user: {
+      id: raw.user.id.trim(),
+      displayName: raw.user.displayName.trim(),
+      email: raw.user.email?.trim() || undefined,
+      avatarUrl: raw.user.avatarUrl?.trim() || undefined,
+      roles: raw.user.roles ?? [],
+    },
+    capabilities: {
+      canPost: caps.canPost ?? true,
+      canComment: caps.canComment ?? true,
+      canModerate: caps.canModerate ?? false,
+      canViewModeration: caps.canViewModeration ?? false,
+    },
+    issuedAt: raw.issuedAt,
+  };
+}
+
+function assertHostSession(raw: HostSessionInput): HostSessionInput {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("ProjectMate.setSession: session object required (or null to clear)");
+  }
+  if (!raw.user || typeof raw.user !== "object") {
+    throw new Error("ProjectMate.setSession: session.user required");
+  }
+  if (!raw.user.id || typeof raw.user.id !== "string" || !raw.user.id.trim()) {
+    throw new Error("ProjectMate.setSession: session.user.id (non-empty string) required");
+  }
+  if (!raw.user.displayName || typeof raw.user.displayName !== "string" || !raw.user.displayName.trim()) {
+    throw new Error("ProjectMate.setSession: session.user.displayName (non-empty string) required");
+  }
+  if (raw.user.email !== undefined && typeof raw.user.email !== "string") {
+    throw new Error("ProjectMate.setSession: session.user.email must be a string when set");
+  }
+  if (raw.user.avatarUrl !== undefined) {
+    if (typeof raw.user.avatarUrl !== "string" || !isHttpUrlOptional(raw.user.avatarUrl)) {
+      throw new Error("ProjectMate.setSession: session.user.avatarUrl must be http(s) URL when set");
+    }
+  }
+  if (raw.user.roles !== undefined && !Array.isArray(raw.user.roles)) {
+    throw new Error("ProjectMate.setSession: session.user.roles must be an array when set");
+  }
+  return normalizeHostSession(raw);
+}
 
 function applyPending(api: EmbedAPI): void {
   if (pendingAction === "open") api.open();
@@ -499,6 +580,21 @@ function bootstrap(raw: InitConfigInput): void {
     });
   }
 
+  function sendHostSessionToIframe(session: HostSessionInput | null): void {
+    sendToIframe({
+      v: PROTOCOL_VERSION,
+      type: "PM_HOST_SESSION",
+      payload: { session },
+    });
+  }
+
+  pushSessionToIframe = sendHostSessionToIframe;
+
+  function applyPendingSession(): void {
+    if (pendingSession === undefined) return;
+    sendHostSessionToIframe(pendingSession);
+  }
+
   function openOverlay(): void {
     if (state.open) return;
     state.previouslyFocused = document.activeElement as HTMLElement | null;
@@ -530,9 +626,11 @@ function bootstrap(raw: InitConfigInput): void {
 
       iframe.addEventListener("load", () => {
         sendConfigToIframe();
+        applyPendingSession();
       });
     } else {
       sendConfigToIframe();
+      applyPendingSession();
     }
 
     requestAnimationFrame(() => {
@@ -653,4 +751,14 @@ function isOpen(): boolean {
   return currentInstance ? currentInstance.isOpen() : false;
 }
 
-export { init, open, close, toggle, isOpen };
+/**
+ * Push host auth context into the overlay (or clear with `null`).
+ * Safe to call before `init` completes; the latest snapshot is sent when the iframe is ready.
+ */
+function setSession(session: HostSessionInput | null): void {
+  const normalized = session === null ? null : assertHostSession(session);
+  pendingSession = normalized;
+  pushSessionToIframe?.(normalized);
+}
+
+export { init, open, close, toggle, isOpen, setSession };
