@@ -138,6 +138,26 @@ Remove or adjust optional blocks you do not use (`changelog`, `issuesEndpoint`, 
 | `launcher` | `{ hidden?, position, offsetX, offsetY, label? }` — set `hidden: true` to skip the floating button entirely (use `autoOpen` and/or `ProjectMate.open()` instead). |
 | `autoOpen` | Open the overlay when the **current page URL** matches any rule (rules are **OR**’d). See below. |
 
+### Minimum issue submission setup
+
+If you see `Issue submission is not configured yet for this workspace.`, your init config is missing both `issuesEndpoint` and `feedbackEndpoint`.
+
+Minimum working setup:
+
+- Keep required fields: `projectId` and `appUrl`
+- Enable at least one entry surface: `features.feedback: true` or `features.issues: true`
+- Set one API base URL: `issuesEndpoint` (preferred) or `feedbackEndpoint`
+- Your API must accept `POST /issues` (full issues UI also uses `GET /issues`)
+
+```js
+ProjectMate.init({
+  projectId: "my-workspace",
+  appUrl: "https://projectmate.uft1.com/overlay/",
+  features: { feedback: true, issues: false },
+  issuesEndpoint: "https://your-api.example.com",
+});
+```
+
 ### Cloudflare issues API
 
 Use a Cloudflare Worker with D1 + R2 to support moderated issue reporting with screenshots.
