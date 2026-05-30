@@ -2,6 +2,8 @@
 
 Universal **iframe overlay** widget: one script on the host (`embed.js`), full support-style UI in a hosted app, wired with `postMessage`.
 
+For a **community hub / forum layer** with host auth, threads, and activity feed, see the separate project: [projectmate-hub](https://github.com/jovylle/projectmate-hub). This repo stays focused on the lightweight embed overlay for existing host integrations.
+
 ---
 
 ## Integrating on a host website (instructions for your project)
